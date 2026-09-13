@@ -132,6 +132,71 @@ const ORBIT_SPEED: Record<"majestic" | "lively", number> = { majestic: 1, lively
 // NOTE: time is compressed for an interactive hero; the Kepler ratios are exact.
 const PERIOD_K = 112.5;
 
+// Constellation pattern-change transition. "crossfade" dissolves the old figure
+// into the new one; "drawon" sketches the new figure in with a stroke-dash cascade;
+// "both" retracts the old figure in reverse while the new one draws in.
+const CONSTELLATION_TRANSITION: "crossfade" | "drawon" | "both" = "both";
+const DRAW_STAGGER = 0.06; // s between edge starts
+// Per-edge constant-velocity drawing: each edge strokes at ~DRAW_VEL fraction of
+// size per second, clamped to [DRAW_DUR_MIN, DRAW_DUR_MAX] so short edges snap and
+// long edges keep the same sweep speed.
+const DRAW_VEL = 0.5;
+const DRAW_DUR_MIN = 0.18;
+const DRAW_DUR_MAX = 0.48;
+const easeOutQuart = (u: number) => 1 - Math.pow(1 - u, 4);
+const easeInOutCubic = (u: number) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
+
+// Cascading draw rhythm: inter-edge start deltas shrink as the figure completes
+// (arpeggio momentum — the last strokes lock in fastest).
+const cascadeLag = (k: number, n: number) =>
+  DRAW_STAGGER * (1 - 0.3 * (n > 1 ? k / (n - 1) : 0));
+
+// Premium transition flair (Element Map: star ignition, pen-tip, nebula halo,
+// light-drain, completion pulse, anticipation coil, anchor echo).
+const IGNITE_BOOST = 0.45; // star flare: base opacity x (1 + IGNITE_BOOST * ignite)
+// Spring ignition (follow-through): damped velocity spring so stars over-shoot
+// ~1.06 then settle in ~0.35s — the "alive" micro-motion after each lock.
+const IGNITE_SPRING_K = 0.14; // spring stiffness per frame (velocity += err * K)
+const IGNITE_SPRING_D = 0.72; // velocity damping per frame (<1; ~0.72 gives the overshoot)
+const IGNITE_SPRING_CUTOFF = 0.006; // freeze the spring once |err| + speed drops below this
+const PULSE_PEAK = 0.16; // completion surge: incoming figure alpha x (1 + pulse)
+const PULSE_OUTGOING_RATIO = 0.35; // completion surge on the retracting figure = PULSE_PEAK x this (whisper)
+const PULSE_DECAY_MULT = 0.945; // per-frame multiplicative settle of the completion pulse (~1s tail)
+const PULSE_CUTOFF = 0.004; // hard zero once the surge falls below this (kills the invisible tail)
+const EDGE_PULSE_PEAK = 0.2; // per-edge snap (incoming): micro-flash peak on each stroke completion
+const EDGE_PULSE_GLOW_BOOST = 2.0; // tip/nebula snap multiplier vs crisp line (x1.4 bloom on lock)
+const EDGE_GLOW_FLASH = 1.4; // nebula bloom pop per unit of snap (adds to NEBULA_OP on lock)
+const EDGE_WIDTH_PULSE = 4.0; // crisp-line thickness pop per unit of snap (LINE_REST_W -> ~2.25px on lock)
+const SNAP_RAMP_MIN = 0.6; // snap crescendo: k-th edge fires at EDGE_PULSE_PEAK x (SNAP_RAMP_MIN + (1-min).k/(n-1))
+// Anticipation coil: just before the cascade finishes, hold star brightness ~10%
+// down so the completion surge after drawP=1 reads as a breath-release.
+const COIL_START = 0.7; // easeDrawP where the coil window opens
+const COIL_DIP = 0.9; // star opacity held to this multiple during the window
+const NEBULA_BREATH = 0.3; // settled halo shimmer: NEBULA_OP x (1 + NEBULA_BREATH * sin)
+const NEBULA_BREATH_PERIOD = 3.0; // s per full neon breath cycle
+// Living nebula: JS-driven feTurbulence drift on the ambient wash (see -nebula filter).
+// Living nebula: cloud-mask filter on the ambient wash (see -nebula filter def).
+const NEBULA_TURB_FREQ = 0.02; // baseFrequency center, primary axis (cloud puff size)
+const NEBULA_TURB_RATIO = 1.6; // secondary axis = FREQ * RATIO (wider-than-tall soft horizontal drift)
+const NEBULA_TURB_AMP = 0.001; // sine amplitude around the center (barely-there drift on the 10s cycle)
+const NEBULA_TURB_PERIOD = 10; // s per full frequency drift cycle
+// Ambient nebula wash: soft halo under the settled figure (and a weak one while drawing).
+const WASH_OP_FULL = 0.12; // settled underlay opacity multiplier (cap WASH_OP_CAP)
+const WASH_OP_DRAWING = 0.06; // half-strength wash while strokes are still arriving
+const WASH_OP_CAP = 0.22; // hard ceiling on wash opacity
+const DRAIN_BOOST = 0.6; // outgoing light-drain bloom relative to retract alpha
+const TIP_LEAD = 0.05; // pen-tip bright head rides ahead of the stroke front
+const TIP_OP = 0.35; // pen-tip peak opacity
+const TIP_PROXIMITY = 1.5; // cursor riding the stroke front brightens the nib up to x(1+TIP_PROXIMITY)
+const TIP_PROX_RADIUS = 0.5; // nib proximity falloff radius as fraction of size
+const TIP_SW = 2.4; // pen-tip stroke width (vs LINE_REST_W crisp edge)
+const NEBULA_OP = 0.055; // settled nebula halo opacity
+const LINE_REST_W = 1.25; // crisp constellation edge resting width (snap pops to ~2.25px)
+// Anchor echo flare: 3-dot secondary sparkle echoing the roll at the anchor star.
+const ECHO_OP = 0.6; // echo dot peak opacity
+const ECHO_DECAY = 0.88; // per-frame decay of the echo burst
+const ECHO_RADII = [0.045, 0.07, 0.095]; // echo flight radii as fraction of size
+
 interface CometGeo {
   head: [number, number];
   lanes: [number, number][][];
@@ -418,6 +483,8 @@ export default function OrbitalRing({
   const moteRefs = useRef<(SVGGElement | null)[]>([]);
   const pointerRef = useRef<{ x: number; y: number } | null>(null);
   const constellationLineRefs = useRef<(SVGLineElement | null)[]>([]);
+  const constellationOutLineRefs = useRef<(SVGLineElement | null)[]>([]);
+  const constellationOutRef = useRef<{ edges: Array<[number, number]>; alpha: number; start: number; bornAt: number } | null>(null);
   const leaderRef = useRef<SVGLineElement | null>(null);
   const constellationLabelRef = useRef<SVGTextElement | null>(null);
   const timeRef = useRef(0);
@@ -427,8 +494,24 @@ export default function OrbitalRing({
     edges: Array<[number, number]>;
     anchor: number;
     alpha: number;
+    drawnAt: number;
   } | null>(null);
   const constellationTargetAlphaRef = useRef(0.85);
+  const constellationTipRefs = useRef<(SVGLineElement | null)[]>([]);
+  const constellationGlowRefs = useRef<(SVGLineElement | null)[]>([]);
+  const constellationGlowOutRefs = useRef<(SVGLineElement | null)[]>([]);
+  const constellationWashRef = useRef<SVGEllipseElement | null>(null);
+  const washTurbRef = useRef<SVGFETurbulenceElement | null>(null);
+  const igniteRef = useRef<Float32Array | null>(null);
+  const igniteTargetRef = useRef<Float32Array | null>(null);
+  const igniteVelRef = useRef<Float32Array | null>(null);
+  const coilRef = useRef(1);
+  const pulseRef = useRef(0);
+  const pulseFiredRef = useRef(false);
+  const edgePulseRef = useRef<Float32Array | null>(null);
+  const constellationEchoRef = useRef<SVGGElement | null>(null);
+  const echoDotRefs = useRef<(SVGCircleElement | null)[]>([]);
+  const burstRef = useRef(0);
   const lastNearestRef = useRef(-1);
   const dwellRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hovering, setHovering] = useState(false);
@@ -442,37 +525,211 @@ export default function OrbitalRing({
     const c = constellationStateRef.current;
     if (c) {
       if (instant) c.alpha = constellationTargetAlphaRef.current;
-      else c.alpha += (constellationTargetAlphaRef.current - c.alpha) * 0.14;
+      else c.alpha += (constellationTargetAlphaRef.current - c.alpha) * 0.1;
     }
-    const a = c ? c.alpha : 0;
+    const t = timeRef.current;
+    const drawOn = c && !instant && CONSTELLATION_TRANSITION !== "crossfade";
+
+    // Pre-pass: per-edge constant-velocity progress (cascade rhythm via cascadeLag —
+    // a 30% accelerating taper so later strokes fall in faster once the sweep is warm).
+    const edgeProg: number[] = [];
+    let maxProg = 0;
+    if (c) {
+      for (let k = 0; k < MAX_CONSTELLATION_EDGES; k++) {
+        if (k < c.edges.length) {
+          const e = c.edges[k];
+          const p0 = pos[e[0]];
+          const p1 = pos[e[1]];
+          const len = p0 && p1 ? Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) : 0;
+          const dur = Math.max(DRAW_DUR_MIN, Math.min(DRAW_DUR_MAX, len / (size * DRAW_VEL)));
+          const prog = drawOn
+            ? Math.min(1, Math.max(0, (t - c.drawnAt - cascadeLag(k, c.edges.length)) / dur))
+            : 1;
+          edgeProg[k] = prog;
+          if (prog > maxProg) maxProg = prog;
+        } else {
+          edgeProg[k] = 1;
+        }
+      }
+    }
+    const drawP = drawOn ? maxProg : 1;
+    const easeDrawP = easeInOutCubic(drawP);
+    // Anticipation coil: hold star brightness slightly down through the final
+    // strokes so the completion surge after drawP=1 lands like a breath-release.
+    coilRef.current = drawOn && easeDrawP >= COIL_START && easeDrawP < 1
+      ? 1 - (1 - COIL_DIP) * Math.min(1, (1 - easeDrawP) / (1 - COIL_START))
+      : 1;
+    // Alpha envelope: figure only materialises where strokes have landed.
+    const a = c ? Math.min(c.alpha, 0.25 + 0.75 * easeDrawP) : 0;
+
+    // Completion pulse: one-shot surge when the cascade finishes.
+    if (drawOn && drawP >= 1 && !pulseFiredRef.current) {
+      pulseFiredRef.current = true;
+      pulseRef.current = PULSE_PEAK;
+    }
+    const pBoost = 1 + pulseRef.current;
+    // Incoming-first: the retracting figure only feels a whisper of the surge.
+    const pBoostOut = 1 + pulseRef.current * PULSE_OUTGOING_RATIO;
+
+    const out = constellationOutRef.current;
+    if (out && !instant) {
+      if (CONSTELLATION_TRANSITION === "both") {
+        const retractLen = DRAW_DUR_MAX + (out.edges.length > 1 ? cascadeLag(out.edges.length - 1, out.edges.length) : 0);
+        out.alpha = t - out.bornAt < retractLen ? out.start : out.alpha * 0.82;
+      } else {
+        out.alpha *= 0.86;
+      }
+      if (out.alpha <= 0.012) constellationOutRef.current = null;
+    }
+    const oa = out && !instant ? out.alpha : 0;
+    const retract = out && !instant && CONSTELLATION_TRANSITION === "both";
+    const outEls = constellationOutLineRefs.current;
+    const glowOutEls = constellationGlowOutRefs.current;
+    for (let k = 0; k < MAX_CONSTELLATION_EDGES; k++) {
+      const el = outEls[k];
+      const glowOut = glowOutEls[k];
+      if (!el) continue;
+      if (oa > 0 && out && k < out.edges.length) {
+        const e = out.edges[k];
+        const p0 = pos[e[0]];
+        const p1 = pos[e[1]];
+        let len = 0;
+        if (p0 && p1) {
+          el.setAttribute("x1", p0[0].toFixed(2));
+          el.setAttribute("y1", p0[1].toFixed(2));
+          el.setAttribute("x2", p1[0].toFixed(2));
+          el.setAttribute("y2", p1[1].toFixed(2));
+          if (glowOut) {
+            glowOut.setAttribute("x1", p0[0].toFixed(2));
+            glowOut.setAttribute("y1", p0[1].toFixed(2));
+            glowOut.setAttribute("x2", p1[0].toFixed(2));
+            glowOut.setAttribute("y2", p1[1].toFixed(2));
+          }
+          len = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+        }
+        const rk = out.edges.length - 1 - k;
+        const dur = Math.max(DRAW_DUR_MIN, Math.min(DRAW_DUR_MAX, len / (size * DRAW_VEL)));
+        const prog = Math.min(1, Math.max(0, (t - out.bornAt - cascadeLag(rk, out.edges.length)) / dur));
+        const easeProg = easeOutQuart(prog);
+        if (retract) {
+          el.setAttribute("stroke-dashoffset", easeProg.toFixed(4));
+          if (glowOut) glowOut.setAttribute("stroke-dashoffset", easeOutQuart(Math.min(1, prog + TIP_LEAD)).toFixed(4));
+        } else {
+          el.setAttribute("stroke-dashoffset", "0");
+          if (glowOut) glowOut.setAttribute("stroke-dashoffset", "0");
+        }
+        el.setAttribute("opacity", (oa * 0.85 * pBoostOut).toFixed(3));
+        if (glowOut) glowOut.setAttribute("opacity", (DRAIN_BOOST * oa * pBoostOut).toFixed(3));
+      } else {
+        el.setAttribute("opacity", "0");
+        if (glowOut) glowOut.setAttribute("opacity", "0");
+      }
+    }
+    const tipEls = constellationTipRefs.current;
+    const glowEls = constellationGlowRefs.current;
+    const igniteT = igniteTargetRef.current;
     for (let k = 0; k < MAX_CONSTELLATION_EDGES; k++) {
       const el = constellationLineRefs.current[k];
       if (!el) continue;
       if (c && k < c.edges.length) {
         const e = c.edges[k];
-        const p0 = pos[c.starIdx[e[0]]];
-        const p1 = pos[c.starIdx[e[1]]];
+        const p0 = pos[e[0]];
+        const p1 = pos[e[1]];
         if (p0 && p1) {
           el.setAttribute("x1", p0[0].toFixed(2));
           el.setAttribute("y1", p0[1].toFixed(2));
           el.setAttribute("x2", p1[0].toFixed(2));
           el.setAttribute("y2", p1[1].toFixed(2));
         }
-        el.setAttribute("opacity", (a * 0.85).toFixed(3));
+        const prog = edgeProg[k];
+        if (prog >= 1 && igniteT) {
+          igniteT[e[0]] = 1;
+          igniteT[e[1]] = 1;
+        }
+        const edgePulseArr = edgePulseRef.current;
+        let edgeP = edgePulseArr ? edgePulseArr[k] : 0;
+        if (drawOn && edgePulseArr && edgeP === 0 && prog >= 1) {
+          // Snap crescendo: early strokes snap quieter, the last edge owns the full flash.
+          const n = c.edges.length;
+          edgeP = EDGE_PULSE_PEAK * (SNAP_RAMP_MIN + (1 - SNAP_RAMP_MIN) * (n > 1 ? k / (n - 1) : 1));
+          edgePulseArr[k] = edgeP;
+        }
+        const ePulse = 1 + edgeP;
+        const ePulseGlow = 1 + edgeP * EDGE_PULSE_GLOW_BOOST;
+        const tip = tipEls[k];
+        const glow = glowEls[k];
+        if (drawOn) {
+          const eDraw = easeOutQuart(prog);
+          const snapW = LINE_REST_W * (1 + edgeP * EDGE_WIDTH_PULSE);
+          el.setAttribute("stroke-dashoffset", (1 - eDraw).toFixed(4));
+          if (edgeP > 0.03) el.setAttribute("stroke", "#EAF8FF");
+          else el.setAttribute("stroke", "#9BD4FF");
+          el.setAttribute("stroke-width", snapW.toFixed(3));
+          el.setAttribute("opacity", (a * 0.85 * pBoost * ePulse * Math.min(1, eDraw * 2)).toFixed(3));
+          if (tip) {
+            tip.setAttribute("stroke-dashoffset", (1 - Math.min(1, eDraw + TIP_LEAD)).toFixed(4));
+            // Cursor-proximity draw power: riding close to the stroke front brightens the nib.
+            let prox = 0;
+            if (ptr && p0 && p1) {
+              const leadT = Math.min(1, eDraw + TIP_LEAD);
+              const tx = p0[0] + (p1[0] - p0[0]) * leadT;
+              const ty = p0[1] + (p1[1] - p0[1]) * leadT;
+              prox = Math.max(0, 1 - Math.hypot(ptr.x - tx, ptr.y - ty) / (TIP_PROX_RADIUS * size));
+            }
+            tip.setAttribute(
+              "opacity",
+              (TIP_OP * a * pBoost * ePulseGlow * Math.min(1, eDraw * 2) * (1 + TIP_PROXIMITY * prox)).toFixed(3),
+            );
+          }
+          if (glow && p0 && p1) {
+            glow.setAttribute("x1", p0[0].toFixed(2));
+            glow.setAttribute("y1", p0[1].toFixed(2));
+            glow.setAttribute("x2", p1[0].toFixed(2));
+            glow.setAttribute("y2", p1[1].toFixed(2));
+            const breath = 1 + NEBULA_BREATH * Math.sin((2 * Math.PI * t) / NEBULA_BREATH_PERIOD);
+            glow.setAttribute(
+              "opacity",
+              prog >= 1
+                ? Math.min(0.42, (NEBULA_OP * breath + edgeP * EDGE_GLOW_FLASH) * a * pBoost).toFixed(3)
+                : "0",
+            );
+          }
+        } else {
+          el.setAttribute("stroke-dashoffset", "0");
+          el.setAttribute("stroke", "#9BD4FF");
+          el.setAttribute("stroke-width", LINE_REST_W.toFixed(2));
+          el.setAttribute("opacity", (a * 0.85 * pBoost * ePulse).toFixed(3));
+          if (tip) {
+            tip.setAttribute("stroke-dashoffset", "0");
+            tip.setAttribute("opacity", "0");
+          }
+          if (glow && p0 && p1) {
+            glow.setAttribute("x1", p0[0].toFixed(2));
+            glow.setAttribute("y1", p0[1].toFixed(2));
+            glow.setAttribute("x2", p1[0].toFixed(2));
+            glow.setAttribute("y2", p1[1].toFixed(2));
+            glow.setAttribute("opacity", (NEBULA_OP * a * pBoost).toFixed(3));
+          }
+        }
       } else {
         el.setAttribute("opacity", "0");
+        const tipEl = tipEls[k];
+        if (tipEl) tipEl.setAttribute("opacity", "0");
+        const glowEl = glowEls[k];
+        if (glowEl) glowEl.setAttribute("opacity", "0");
       }
     }
     const lead = leaderRef.current;
     if (lead) {
       if (c && ptr && a > 0.02) {
-        const p = pos[c.starIdx[c.anchor]];
+        const p = pos[c.anchor];
         if (p) {
           lead.setAttribute("x1", p[0].toFixed(2));
           lead.setAttribute("y1", p[1].toFixed(2));
           lead.setAttribute("x2", ptr.x.toFixed(2));
           lead.setAttribute("y2", ptr.y.toFixed(2));
-          lead.setAttribute("opacity", (Math.min(1, a * 1.4) * 0.75).toFixed(3));
+          const leadVis = (drawOn ? Math.min(1, easeDrawP / 0.5) : 1) * Math.min(1, a * 1.4) * 0.75;
+          lead.setAttribute("opacity", leadVis.toFixed(3));
         }
       } else {
         lead.setAttribute("opacity", "0");
@@ -481,14 +738,57 @@ export default function OrbitalRing({
     const lab = constellationLabelRef.current;
     if (lab) {
       if (c && a > 0.02) {
-        const p = pos[c.starIdx[c.anchor]];
+        const p = pos[c.anchor];
         if (p) {
           lab.setAttribute("x", (p[0] + size * 0.024).toFixed(2));
           lab.setAttribute("y", (p[1] - size * 0.026).toFixed(2));
-          lab.setAttribute("opacity", (a * 0.98).toFixed(3));
+          const labVis = (drawOn ? Math.min(1, easeDrawP / 0.7) : 1) * a * 0.98;
+          lab.setAttribute("opacity", labVis.toFixed(3));
+          lab.setAttribute("letter-spacing", `${(0.34 - 0.08 * Math.min(1, labVis)).toFixed(3)}em`);
         }
       } else {
         lab.setAttribute("opacity", "0");
+        lab.setAttribute("letter-spacing", "0.34em");
+      }
+    }
+
+    const wash = constellationWashRef.current;
+    if (wash) {
+      if (c && !instant && drawOn && drawP > 0 && c.edges.length > 0) {
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        for (let ei = 0; ei < c.edges.length; ei++) {
+          const paA = pos[c.edges[ei][0]];
+          const paB = pos[c.edges[ei][1]];
+          if (!paA || !paB) continue;
+          if (paA[0] < minX) minX = paA[0];
+          if (paB[0] < minX) minX = paB[0];
+          if (paA[0] > maxX) maxX = paA[0];
+          if (paB[0] > maxX) maxX = paB[0];
+          if (paA[1] < minY) minY = paA[1];
+          if (paB[1] < minY) minY = paB[1];
+          if (paA[1] > maxY) maxY = paA[1];
+          if (paB[1] > maxY) maxY = paB[1];
+        }
+        if (isFinite(minX) && isFinite(minY)) {
+          const wcx = (minX + maxX) / 2;
+          const wcy = (minY + maxY) / 2;
+          const wrx = Math.max(size * 0.05, ((maxX - minX) / 2) * 1.35);
+          const wry = Math.max(size * 0.05, ((maxY - minY) / 2) * 1.35);
+          const wBreath = 1 + NEBULA_BREATH * Math.sin((2 * Math.PI * t) / NEBULA_BREATH_PERIOD);
+          const settled = drawP >= 1;
+          const wProgress = settled ? 1 : Math.min(1, drawP * 2);
+          const wFactor = settled ? WASH_OP_FULL : WASH_OP_DRAWING;
+          wash.setAttribute("cx", wcx.toFixed(2));
+          wash.setAttribute("cy", wcy.toFixed(2));
+          wash.setAttribute("rx", wrx.toFixed(2));
+          wash.setAttribute("ry", wry.toFixed(2));
+          wash.setAttribute("opacity", Math.min(WASH_OP_CAP, wFactor * wProgress * wBreath * a).toFixed(3));
+        }
+      } else {
+        wash.setAttribute("opacity", "0");
       }
     }
     },
@@ -587,7 +887,21 @@ export default function OrbitalRing({
         const [x, y] = orbitScreenPos(s, t2, cx, cy);
         loopPos[i] = [x, y];
         const g = starRefs.current[i];
-        if (g) g.setAttribute("transform", `translate(${x.toFixed(2)},${y.toFixed(2)})`);
+        if (g) {
+          g.setAttribute("transform", `translate(${x.toFixed(2)},${y.toFixed(2)})`);
+          const ignite = igniteRef.current?.[i] ?? 0;
+          const tgt = igniteTargetRef.current?.[i] ?? 0;
+          const velArr = igniteVelRef.current;
+          // Damped velocity spring: overshoots ~1.06 then settles (follow-through).
+          let vel = velArr?.[i] ?? 0;
+          if (vel !== 0 || Math.abs(tgt - ignite) > IGNITE_SPRING_CUTOFF) {
+            vel = (vel + (tgt - ignite) * IGNITE_SPRING_K) * IGNITE_SPRING_D;
+            if (velArr) velArr[i] = vel;
+            if (igniteRef.current) igniteRef.current[i] = ignite + vel;
+          }
+          const current = igniteRef.current?.[i] ?? ignite;
+          g.setAttribute("opacity", (s.base * (1 + IGNITE_BOOST * current) * coilRef.current).toFixed(3));
+        }
         const line = lineRefs.current[i];
         if (line) {
           if (!ptr) {
@@ -605,6 +919,49 @@ export default function OrbitalRing({
       }
 
       paintConstellation(ptr, loopPos);
+
+      // Anchor echo flare: 3-dot secondary sparkle flying out from the anchor as the burst fades.
+      const echo = constellationEchoRef.current;
+      if (echo) {
+        if (burstRef.current > 0.01) {
+          const cst = constellationStateRef.current;
+          const ap = cst ? loopPos[cst.anchor] : null;
+          if (ap) {
+            echo.setAttribute("transform", `translate(${ap[0].toFixed(2)},${ap[1].toFixed(2)})`);
+            const be = burstRef.current;
+            const dir = [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3];
+            for (let i = 0; i < echoDotRefs.current.length; i++) {
+              const d = echoDotRefs.current[i];
+              if (d) {
+                const r = ECHO_RADII[i] * size * (1 - be);
+                d.setAttribute("cx", (Math.cos(dir[i]) * r).toFixed(2));
+                d.setAttribute("cy", (Math.sin(dir[i]) * r).toFixed(2));
+              }
+            }
+            echo.setAttribute("opacity", (ECHO_OP * be).toFixed(3));
+            burstRef.current *= ECHO_DECAY;
+            if (burstRef.current < 0.01) burstRef.current = 0;
+          }
+        } else {
+          echo.setAttribute("opacity", "0");
+        }
+      }
+
+      if (washTurbRef.current) {
+        const f = NEBULA_TURB_FREQ + NEBULA_TURB_AMP * Math.sin((2 * Math.PI * t) / NEBULA_TURB_PERIOD);
+        washTurbRef.current.setAttribute("baseFrequency", `${f.toFixed(5)} ${(f * NEBULA_TURB_RATIO).toFixed(5)}`);
+      }
+
+      if (pulseRef.current > 0) {
+        pulseRef.current *= PULSE_DECAY_MULT;
+        if (pulseRef.current < PULSE_CUTOFF) pulseRef.current = 0;
+      }
+      const edgePulseArr = edgePulseRef.current;
+      if (edgePulseArr) {
+        for (let i = 0; i < edgePulseArr.length; i++) {
+          if (edgePulseArr[i] > 0) edgePulseArr[i] *= 0.92;
+        }
+      }
 
       raf = requestAnimationFrame(frame);
     };
@@ -728,14 +1085,40 @@ export default function OrbitalRing({
     }
     if (edges.length === 0) return;
 
+    const prev = constellationStateRef.current;
+    if (prev && !reducedEff) {
+      constellationOutRef.current = { edges: prev.edges, alpha: Math.max(prev.alpha, 0.04), start: Math.max(prev.alpha, CONSTELLATION_TRANSITION === "both" ? 0.55 : 0.04), bornAt: timeRef.current };
+    }
+
+    const anchorIdx = starIdx[vAnchor];
+    if (CONSTELLATION_TRANSITION !== "crossfade") {
+      const ap = pos[anchorIdx];
+      if (ap) {
+        edges.sort(([a1, b1], [a2, b2]) => {
+          const d1 = Math.min(Math.hypot(pos[a1][0] - ap[0], pos[a1][1] - ap[1]), Math.hypot(pos[b1][0] - ap[0], pos[b1][1] - ap[1]));
+          const d2 = Math.min(Math.hypot(pos[a2][0] - ap[0], pos[a2][1] - ap[1]), Math.hypot(pos[b2][0] - ap[0], pos[b2][1] - ap[1]));
+          return d1 - d2;
+        });
+      }
+    }
+
     constellationStateRef.current = {
       name: entry.name,
       starIdx,
       edges,
-      anchor: starIdx[vAnchor],
+      anchor: anchorIdx,
       alpha: 0.12,
+      drawnAt: timeRef.current,
     };
     constellationTargetAlphaRef.current = 0.85;
+    const freshIgnite = new Float32Array(stars.length);
+    igniteTargetRef.current = freshIgnite;
+    igniteRef.current = new Float32Array(stars.length);
+    igniteVelRef.current = new Float32Array(stars.length);
+    freshIgnite[anchorIdx] = 1;
+    burstRef.current = 1;
+    pulseFiredRef.current = false;
+    edgePulseRef.current = new Float32Array(edges.length);
     if (constellationLabelRef.current) {
       constellationLabelRef.current.textContent = entry.name.toUpperCase();
     }
@@ -822,6 +1205,12 @@ export default function OrbitalRing({
     setHovering(false);
     constellationTargetAlphaRef.current = 0;
     lastNearestRef.current = -1;
+    if (igniteTargetRef.current) igniteTargetRef.current.fill(0);
+    if (igniteVelRef.current) igniteVelRef.current.fill(0);
+    if (edgePulseRef.current) edgePulseRef.current.fill(0);
+    coilRef.current = 1;
+    burstRef.current = 0;
+    if (constellationEchoRef.current) constellationEchoRef.current.setAttribute("opacity", "0");
     if (dwellRef.current) {
       clearTimeout(dwellRef.current);
       dwellRef.current = null;
@@ -924,6 +1313,11 @@ export default function OrbitalRing({
               <stop offset="100%" stopColor={hue} stopOpacity="0" />
             </radialGradient>
           ))}
+          <radialGradient id={`${id}-washglow`} colorInterpolation="linearRGB">
+            <stop offset="0%" stopColor="#9BD4FF" stopOpacity="0.8" />
+            <stop offset="55%" stopColor="#7FB8E8" stopOpacity="0.24" />
+            <stop offset="100%" stopColor="#9BD4FF" stopOpacity="0" />
+          </radialGradient>
           <filter id={`${id}-coreblur`} x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="linearRGB">
             <feGaussianBlur stdDeviation={size * tuning.coreS} />
           </filter>
@@ -933,8 +1327,11 @@ export default function OrbitalRing({
           <filter id={`${id}-haloblur`} x="-30%" y="-30%" width="160%" height="160%" colorInterpolationFilters="linearRGB">
             <feGaussianBlur stdDeviation={size * tuning.haloS} />
           </filter>
-          <filter id={`${id}-softglow`} x="-60%" y="-60%" width="220%" height="220%" colorInterpolationFilters="linearRGB">
-            <feGaussianBlur stdDeviation={size * 0.05} />
+          <filter id={`${id}-nebula`} x="-100%" y="-100%" width="300%" height="300%" colorInterpolationFilters="sRGB">
+            <feTurbulence ref={washTurbRef} type="fractalNoise" baseFrequency={NEBULA_TURB_FREQ} numOctaves="3" seed="7" result="noise" />
+            <feColorMatrix in="noise" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 8 -3" result="cloud" />
+            <feComposite in="SourceGraphic" in2="cloud" operator="in" result="washed" />
+            <feGaussianBlur in="washed" stdDeviation={size * 0.004} />
           </filter>
         </defs>
 
@@ -1178,23 +1575,104 @@ export default function OrbitalRing({
 
         {Array.from({ length: MAX_CONSTELLATION_EDGES }, (_, i) => (
           <line
+            key={`glowout-${i}`}
+            ref={(el) => { constellationGlowOutRefs.current[i] = el; }}
+            x1={0} y1={0} x2={0} y2={0}
+            stroke="#E2F4FF"
+            strokeWidth={3.8}
+            vectorEffect="non-scaling-stroke"
+            strokeLinecap="round"
+            filter={`url(#${id}-haloblur)`}
+            pathLength={1}
+            strokeDasharray="1 1"
+            strokeDashoffset="1"
+            opacity="0"
+          />
+        ))}
+        <ellipse
+          ref={constellationWashRef}
+          cx={0} cy={0}
+          rx={0} ry={0}
+          fill={`url(#${id}-washglow)`}
+          filter={`url(#${id}-nebula)`}
+          opacity="0"
+        />
+        {Array.from({ length: MAX_CONSTELLATION_EDGES }, (_, i) => (
+          <line
+            key={`ocline-${i}`}
+            ref={(el) => { constellationOutLineRefs.current[i] = el; }}
+            x1={0} y1={0} x2={0} y2={0}
+            stroke="#9BD4FF"
+            strokeWidth={LINE_REST_W}
+            vectorEffect="non-scaling-stroke"
+            strokeLinecap="round"
+            pathLength={1}
+            strokeDasharray="1 1"
+            strokeDashoffset="1"
+            opacity="0"
+          />
+        ))}
+        {Array.from({ length: MAX_CONSTELLATION_EDGES }, (_, i) => (
+          <line
+            key={`glow-${i}`}
+            ref={(el) => { constellationGlowRefs.current[i] = el; }}
+            x1={0} y1={0} x2={0} y2={0}
+            stroke="#9BD4FF"
+            strokeWidth={4}
+            vectorEffect="non-scaling-stroke"
+            strokeLinecap="round"
+            filter={`url(#${id}-haloblur)`}
+            opacity="0"
+          />
+        ))}
+        {Array.from({ length: MAX_CONSTELLATION_EDGES }, (_, i) => (
+          <line
+            key={`tip-${i}`}
+            ref={(el) => { constellationTipRefs.current[i] = el; }}
+            x1={0} y1={0} x2={0} y2={0}
+            stroke="#E2F4FF"
+            strokeWidth={TIP_SW}
+            vectorEffect="non-scaling-stroke"
+            strokeLinecap="round"
+            filter={`url(#${id}-haloblur)`}
+            pathLength={1}
+            strokeDasharray="1 1"
+            strokeDashoffset="1"
+            opacity="0"
+          />
+        ))}
+        {Array.from({ length: MAX_CONSTELLATION_EDGES }, (_, i) => (
+          <line
             key={`cline-${i}`}
             ref={(el) => { constellationLineRefs.current[i] = el; }}
             x1={0} y1={0} x2={0} y2={0}
             stroke="#9BD4FF"
-            strokeWidth={1.15}
-            strokeDasharray="5 5"
+            strokeWidth={LINE_REST_W}
             vectorEffect="non-scaling-stroke"
             strokeLinecap="round"
+            pathLength={1}
+            strokeDasharray="1 1"
+            strokeDashoffset="1"
             opacity="0"
           />
         ))}
+        <g ref={constellationEchoRef} opacity="0">
+          {ECHO_RADII.map((_, i) => (
+            <circle
+              key={`echo-${i}`}
+              ref={(el) => { echoDotRefs.current[i] = el; }}
+              cx={0} cy={0}
+              r={size * 0.008}
+              fill="#EAF8FF"
+              filter={`url(#${id}-coreblur)`}
+            />
+          ))}
+        </g>
         <line
           ref={leaderRef}
           x1={0} y1={0} x2={0} y2={0}
           stroke="#FFD894"
           strokeWidth={0.9}
-          strokeDasharray="3 4"
           vectorEffect="non-scaling-stroke"
           strokeLinecap="round"
           opacity="0"
