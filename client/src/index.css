@@ -37,13 +37,13 @@ body {
 
 /* ── Ticker contains a seamless duplicated loop ─────────── */
 .ticker-track {
-  animation: ticker 45s linear infinite;
+  animation: ticker 45s linear infinite !important;
   display: flex;
   width: max-content;
   will-change: transform;
 }
 .ticker-track:hover {
-  animation-play-state: paused;
+  animation-play-state: paused !important;
 }
 
 .orbital-float {
@@ -52,14 +52,6 @@ body {
 
 .glow-pulse {
   animation: glow-pulse 4s ease-in-out infinite;
-}
-
-/* ── Opted-in ticker motion (scoped: only the ticker animates; orbital stays static in reduced motion) ── */
-.ticker-force .ticker-track {
-  animation: ticker 45s linear infinite !important;
-}
-.ticker-force .ticker-track:hover {
-  animation-play-state: paused !important;
 }
 
 /* ── Scrollbar ───────────────────────────────────────────── */

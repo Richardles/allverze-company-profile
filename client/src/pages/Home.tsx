@@ -1,10 +1,9 @@
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../theme/ThemeContext";
 import { useThemeColors } from "../theme/useThemeColors";
 import OrbitalRing from "../components/OrbitalRing";
 import ShieldIcon from "../components/ShieldIcon";
-import { usePrefersReducedMotion } from "../lib/browser";
 
 const capabilities = [
   {
@@ -119,8 +118,6 @@ export default function Home() {
   const navigate = useNavigate();
   const { isDark } = useTheme();
   const colors = useThemeColors();
-  const reduced = usePrefersReducedMotion();
-  const [forcePlay, setForcePlay] = useState(false);
 
   const tagBg = colors.tagBg;
   const tagColor = colors.tagColor;
@@ -262,9 +259,8 @@ export default function Home() {
 
       {/* ── TRUST TICKER ──────────────────────────────────────── */}
       <div
-        className={`overflow-hidden py-4 select-none ${forcePlay ? "ticker-force" : ""}`}
+        className="overflow-hidden py-4 select-none"
         style={{
-          position: "relative",
           background: "#071526",
           borderTop: "1px solid rgba(0,85,229,0.16)",
           borderBottom: "1px solid rgba(0,85,229,0.16)",
@@ -280,37 +276,6 @@ export default function Home() {
             </div>
           ))}
         </div>
-        {reduced && !forcePlay && (
-          <button
-            type="button"
-            onClick={() => setForcePlay(true)}
-            style={{
-              position: "absolute",
-              right: 16,
-              top: "50%",
-              transform: "translateY(-50%)",
-              width: 40,
-              height: 40,
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "rgba(6,14,26,0.55)",
-              border: "1px solid rgba(56,189,248,0.30)",
-              color: "#38BDF8",
-              backdropFilter: "blur(6px)",
-              WebkitBackdropFilter: "blur(6px)",
-              cursor: "pointer",
-              zIndex: 1,
-            }}
-            aria-label="Play animation"
-            title="Play animation"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </button>
-        )}
       </div>
 
       {/* ── IMPACT METRICS ────────────────────────────────────── */}
