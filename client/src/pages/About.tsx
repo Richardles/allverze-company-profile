@@ -91,17 +91,17 @@ const team = [
 const pillars = ["Best Service", "Best Quality", "Integrity", "Reliability", "Professionalism"];
 
 const orbitalStory = [
-  { label: "Continuous Connection", desc: "The infinite loop represents our commitment to unbroken partnership — no hand-offs, no gaps, no disappearing acts post-launch." },
-  { label: "Navy → Blue → Cyan",    desc: "The gradient reflects our journey: from the depth of foundational expertise to the clarity of innovative breakthrough." },
-  { label: "Technology & Collaboration", desc: "Two interlocking arcs reflect the union of technical mastery and human-centered advisory — always in motion, always together." },
-  { label: "Better Every Day",       desc: "The ring never ends, just as our pursuit of continuous improvement never stops. Every orbit brings new insight." },
+  { label: "Connected Ecosystem",   desc: "The infinite loop represents our commitment to unbroken partnership — no hand-offs, no gaps, no disappearing acts post-launch." },
+  { label: "The Color of Trust",    desc: "Blue stands for trust, reliability, professionalism, stability, and technology — the foundation of every solution we build." },
+  { label: "Technology & Collaboration", desc: "One unbroken orbit uniting technology and collaboration — always in motion, always together." },
+  { label: "Better Every Day",      desc: "The ring never ends, just as our pursuit of continuous improvement never stops. Every orbit brings new insight — and unlimited possibilities." },
 ];
 
 const missionPillars = [
-  "Deliver reliable, production-grade technology that performs when it matters most.",
-  "Connect diverse expertise from A to Z — no challenge too broad or too specialized.",
-  "Build long-term relationships anchored in integrity, transparency, and mutual respect.",
-  "Pursue continuous improvement — \"Better Every Day\" is our operating discipline.",
+  "Empower businesses with reliable technology, practical solutions, and continuous innovation.",
+  "Connect diverse expertise, technologies, and ideas from A to Z to solve real-world business challenges.",
+  "Build long-term relationships through integrity, excellence, reliability, and professionalism.",
+  "Continuously improve our people, solutions, and services — becoming better every day.",
 ];
 
 export default function About() {
@@ -136,9 +136,12 @@ export default function About() {
             <span style={{ color: "#38BDF8" }}>Possibilities</span>
           </h1>
           <p className="fade-in-up fade-in-up-2" style={{ marginTop: 20, fontSize: "1.0625rem", color: "rgba(248,250,252,0.58)", lineHeight: 1.75, maxWidth: 560 }}>
-            <strong style={{ color: "rgba(248,250,252,0.82)", fontWeight: 600 }}>All</strong> — the breadth of every solution imaginable.{" "}
-            <strong style={{ color: "rgba(248,250,252,0.82)", fontWeight: 600 }}>Verze</strong> — a universe of possibilities, boundless and ever-expanding.
+            <strong style={{ color: "rgba(248,250,252,0.82)", fontWeight: 600 }}>All</strong> — all-encompassing solutions for every business.{" "}
+            <strong style={{ color: "rgba(248,250,252,0.82)", fontWeight: 600 }}>Verze</strong> — a universe of unlimited possibilities, boundless and ever-expanding.
             Together: your partner from A to Z.
+          </p>
+          <p className="fade-in-up fade-in-up-3" style={{ marginTop: 14, fontSize: "1.0625rem", color: "rgba(248,250,252,0.42)", lineHeight: 1.75, maxWidth: 600 }}>
+            Allverze represents a universe of solutions — bringing different technologies, expertise, and ideas together to solve real business challenges.
           </p>
         </div>
       </section>
@@ -209,7 +212,7 @@ export default function About() {
                 <span style={{ fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#38BDF8" }}>Vision</span>
               </div>
               <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: "#F8FAFC", lineHeight: 1.45, letterSpacing: "-0.01em" }}>
-                To be the most trusted technology partner connecting innovation, expertise, and integrity — worldwide.
+                A trusted business partner that connects innovation, expertise, and integrity to create meaningful value for businesses and the community.
               </h3>
               <p style={{ fontSize: "0.875rem", color: "rgba(248,250,252,0.50)", lineHeight: 1.75 }}>
                 Every business, regardless of size, deserves enterprise-grade technology delivered with honesty, precision, and genuine care for outcomes.

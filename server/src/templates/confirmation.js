@@ -1,5 +1,4 @@
 import { escapeHtml } from '../lib/format.js';
-import { EMAIL_LOGO_SRC } from './logo.js';
 
 export function renderConfirmation({
   leadRef,
@@ -54,7 +53,7 @@ The Allverze Team`,
           <!-- Header -->
           <tr>
             <td style="background:#0B1D35;padding:36px 40px 28px;text-align:center;">
-              <img src="${EMAIL_LOGO_SRC}" alt="Allverze" width="210" style="width:210px;height:auto;max-width:60%;display:inline-block;border:0;outline:none;text-decoration:none;" />
+              <span style="font-size:24px;font-weight:800;color:#FFFFFF;letter-spacing:0.03em;">Allverze</span>
               <p style="margin:14px 0 0;font-size:12px;font-weight:600;color:#8AA0BD;letter-spacing:0.08em;text-transform:uppercase;">Allverze Corporation</p>
             </td>
           </tr>

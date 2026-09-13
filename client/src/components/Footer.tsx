@@ -123,7 +123,7 @@ export default function Footer() {
               />
             </NavLink>
             <p style={{ fontSize: "0.855rem", color: "rgba(248,250,252,0.36)", lineHeight: 1.72, maxWidth: 300 }}>
-              Connecting possibilities through technology, ideas, and dependable execution. We solve, not just sell.
+              Connecting possibilities through technology, ideas, and dependable execution. We Solve — Not Just Sell.
             </p>
             <div className="flex items-center gap-2">
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E" }} />

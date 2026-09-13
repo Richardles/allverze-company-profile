@@ -92,6 +92,36 @@ export default function Header() {
 
         {/* Right controls */}
         <div className="hidden md:flex items-center gap-3">
+          {/* Theme toggle */}
+          <button
+            onClick={toggle}
+            className="flex items-center justify-center transition-all duration-200 hover:opacity-80"
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: "50%",
+              background: isDark ? "rgba(56,189,248,0.06)" : "rgba(0,85,229,0.04)",
+              border: isDark ? "1px solid rgba(56,189,248,0.14)" : "1px solid rgba(0,85,229,0.10)",
+              color: isDark ? "#38BDF8" : "#0055E5",
+            }}
+            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {isDark ? (
+              <span key="light" className="animate-theme-pop" style={{ display: "flex" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5" />
+                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                </svg>
+              </span>
+            ) : (
+              <span key="dark" className="animate-theme-pop" style={{ display: "flex" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              </span>
+            )}
+          </button>
+
           <button
             onClick={() => navigate("/contact")}
             className="inline-flex items-center gap-2 text-sm font-semibold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.98]"
@@ -104,66 +134,21 @@ export default function Header() {
           >
             Let's Talk
           </button>
-
-          {/* Theme toggle */}
-          <button
-            onClick={toggle}
-            className="flex items-center justify-center transition-all duration-200 hover:scale-105"
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 9,
-              background: isDark ? "rgba(56,189,248,0.10)" : "rgba(0,85,229,0.07)",
-              border: isDark ? "1px solid rgba(56,189,248,0.22)" : "1px solid rgba(0,85,229,0.15)",
-              color: isDark ? "#38BDF8" : "#0055E5",
-            }}
-            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-          >
-            {isDark ? (
-              <span key="light" className="animate-theme-pop" style={{ display: "flex" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="5" />
-                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-                </svg>
-              </span>
-            ) : (
-              <span key="dark" className="animate-theme-pop" style={{ display: "flex" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                </svg>
-              </span>
-            )}
-          </button>
         </div>
 
         {/* Mobile controls */}
         <div className="md:hidden flex items-center gap-2">
           <button
-            onClick={toggle}
-            className="flex items-center justify-center"
+            onClick={() => { navigate("/contact"); setMenuOpen(false); }}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.98]"
             style={{
-              width: 36,
-              height: 36,
+              background: "#0055E5",
               borderRadius: 8,
-              background: isDark ? "rgba(56,189,248,0.10)" : "rgba(0,85,229,0.07)",
-              color: isDark ? "#38BDF8" : "#0055E5",
+              padding: "8px 16px",
+              boxShadow: "0 2px 12px rgba(0,85,229,0.32)",
             }}
-            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
           >
-            {isDark ? (
-              <span key="light" className="animate-theme-pop" style={{ display: "flex" }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <circle cx="12" cy="12" r="5" />
-                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-                </svg>
-              </span>
-            ) : (
-              <span key="dark" className="animate-theme-pop" style={{ display: "flex" }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                </svg>
-              </span>
-            )}
+            Let's Talk
           </button>
           <button
             className="p-2 focus-visible:outline-none"
@@ -193,6 +178,34 @@ export default function Header() {
             background: mobileMenuBg,
           }}
         >
+          <button
+            onClick={toggle}
+            className="menu-link self-end flex items-center justify-center transition-all duration-200 hover:opacity-80"
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: "50%",
+              background: isDark ? "rgba(56,189,248,0.06)" : "rgba(0,85,229,0.04)",
+              border: isDark ? "1px solid rgba(56,189,248,0.14)" : "1px solid rgba(0,85,229,0.10)",
+              color: isDark ? "#38BDF8" : "#0055E5",
+            }}
+            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {isDark ? (
+              <span key="light" className="animate-theme-pop" style={{ display: "flex" }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="5" />
+                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                </svg>
+              </span>
+            ) : (
+              <span key="dark" className="animate-theme-pop" style={{ display: "flex" }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              </span>
+            )}
+          </button>
           {navLinks.map(({ label, path }, i) => (
             <NavLink
               key={path}
@@ -214,13 +227,6 @@ export default function Header() {
               {label}
             </NavLink>
           ))}
-          <button
-            onClick={() => { navigate("/contact"); setMenuOpen(false); }}
-            className="menu-link mt-3 self-start text-sm font-semibold text-white"
-            style={{ background: "#0055E5", borderRadius: 8, padding: "9px 22px", animationDelay: `${60 + navLinks.length * 35}ms` }}
-          >
-            Let's Talk
-          </button>
         </div>
       )}
     </header>

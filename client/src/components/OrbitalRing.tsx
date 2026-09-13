@@ -300,6 +300,8 @@ export default function OrbitalRing({
   speed = "majestic",
 }: OrbitalRingProps) {
   const reduced = usePrefersReducedMotion();
+  const [forcePlay, setForcePlay] = useState(false);
+  const reducedEff = reduced && !forcePlay;
   const tuning = VARIANTS[variant];
   const cx = size / 2;
   const cy = size / 2;
@@ -494,7 +496,7 @@ export default function OrbitalRing({
   );
 
   useEffect(() => {
-    if (!interactive || !comet || reduced) return;
+    if (!interactive || !comet || reducedEff) return;
     const t0 = performance.now();
     let raf = 0;
 
@@ -615,7 +617,7 @@ export default function OrbitalRing({
         dwellRef.current = null;
       }
     };
-  }, [stars, comet, reduced, interactive, cx, cy, reactRadius, size, paintConstellation]);
+  }, [stars, comet, reducedEff, interactive, cx, cy, reactRadius, size, paintConstellation]);
 
   const applyLines = (ptr: { x: number; y: number }) => {
     for (let i = 0; i < stars.length; i++) {
@@ -738,7 +740,7 @@ export default function OrbitalRing({
       constellationLabelRef.current.textContent = entry.name.toUpperCase();
     }
     lastNearestRef.current = sAnchor;
-    paintConstellation(ptr, pos, reduced);
+    paintConstellation(ptr, pos, reducedEff);
   };
 
   const updateTargetAlpha = (ptr: { x: number; y: number }, pos: [number, number][]) => {
@@ -798,14 +800,14 @@ export default function OrbitalRing({
       rollConstellation(ptr, pos);
     } else {
       updateTargetAlpha(ptr, pos);
-      if (reduced) paintConstellation(ptr, pos, true);
+      if (reducedEff) paintConstellation(ptr, pos, true);
     }
     if (dwellRef.current) clearTimeout(dwellRef.current);
     dwellRef.current = setTimeout(() => {
       const p = pointerRef.current;
       if (p) rollConstellation(p);
     }, 2000);
-    if (reduced) applyLines(ptr);
+    if (reducedEff) applyLines(ptr);
   };
 
   const handleEnter = () => {
@@ -836,8 +838,7 @@ export default function OrbitalRing({
     <div
       ref={wrapRef}
       className={className}
-      style={{ maxWidth: size, width: "100%", marginInline: "auto" }}
-      aria-hidden="true"
+      style={{ maxWidth: size, width: "100%", marginInline: "auto", position: "relative" }}
       {...(interactive
         ? { onMouseEnter: handleEnter, onMouseMove: handleMove, onMouseLeave: handleLeave }
         : {})}
@@ -848,6 +849,7 @@ export default function OrbitalRing({
         viewBox={`0 0 ${size} ${size}`}
         style={{ overflow: "visible", display: "block" }}
         shapeRendering="geometricPrecision"
+        aria-hidden="true"
       >
         <defs>
           <linearGradient id={`${id}-g1`} x1="0%" y1="0%" x2="100%" y2="100%" colorInterpolation="linearRGB">
@@ -992,7 +994,7 @@ export default function OrbitalRing({
                   opacity={layer.o}
                   filter={`url(#${f})`}
                 >
-                  {!reduced && (
+                  {!reducedEff && (
                     <animateTransform
                       attributeName="transform"
                       type="rotate"
@@ -1130,7 +1132,7 @@ export default function OrbitalRing({
           </>
         )}
 
-        {!reduced && !interactive && (
+        {!reducedEff && !interactive && (
           <>
             <g>
               <circle r={size * 0.02} fill="#38BDF8" filter={`url(#${id}-coreblur)`}>
@@ -1216,6 +1218,38 @@ export default function OrbitalRing({
           fill="none" stroke="none"
         />
       </svg>
+
+      {reducedEff && (
+        <button
+          type="button"
+          onClick={() => setForcePlay(true)}
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            transform: "translate(-50%,-50%)",
+            width: 44,
+            height: 44,
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(6,14,26,0.55)",
+            border: "1px solid rgba(56,189,248,0.30)",
+            color: "#38BDF8",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+            cursor: "pointer",
+            zIndex: 1,
+          }}
+          aria-label="Play orbital animation"
+          title="Play orbital animation"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }

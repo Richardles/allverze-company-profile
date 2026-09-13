@@ -54,6 +54,14 @@ body {
   animation: glow-pulse 4s ease-in-out infinite;
 }
 
+/* ── Opted-in ticker motion (scoped: only the ticker animates; orbital stays static in reduced motion) ── */
+.ticker-force .ticker-track {
+  animation: ticker 45s linear infinite !important;
+}
+.ticker-force .ticker-track:hover {
+  animation-play-state: paused !important;
+}
+
 /* ── Scrollbar ───────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }

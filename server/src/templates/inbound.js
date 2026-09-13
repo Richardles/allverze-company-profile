@@ -1,5 +1,4 @@
 import { escapeHtml } from '../lib/format.js';
-import { EMAIL_LOGO_SRC } from './logo.js';
 
 export function renderInbound({ leadRef, receivedAt, userReceivedAt, intentLabel, name, email, phone, message, waHref }) {
   const safeName = escapeHtml(name);
@@ -38,7 +37,7 @@ RESPONSE SLA: Reply to this customer within 1 business day.`,
           <!-- Header -->
           <tr>
             <td style="background:#0B1D35;padding:36px 40px 28px;text-align:center;">
-              <img src="${EMAIL_LOGO_SRC}" alt="Allverze" width="210" style="width:210px;height:auto;max-width:60%;display:inline-block;border:0;outline:none;text-decoration:none;" />
+              <span style="font-size:24px;font-weight:800;color:#FFFFFF;letter-spacing:0.03em;">Allverze</span>
               <p style="margin:14px 0 14px;font-size:12px;font-weight:600;color:#8AA0BD;letter-spacing:0.08em;text-transform:uppercase;">New Contact Message</p>
               <div style="display:inline-block;background:rgba(56,189,248,0.15);color:#38BDF8;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:5px 14px;border-radius:999px;border:1px solid rgba(56,189,248,0.25);">New Inquiry</div>
             </td>

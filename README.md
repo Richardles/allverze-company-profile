@@ -25,7 +25,7 @@ npm-workspaces monorepo with two packages:
     ├── server.mjs      entry (dotenv/config, config, app, listen) — local + Docker
     ├── vercel.mjs      Vercel serverless entry (exports the Express app)
     ├── vercel.json     Vercel build config (@vercel/node + catch-all routes)
-    ├── assets/         email-logo.png (base64 inline)
+    ├── assets/         email-logo.png (kept for future CID/hosted use)
     └── src/
         ├── app.js      middleware + routing + error handling
         ├── config.js   env config with fail-fast
@@ -33,7 +33,7 @@ npm-workspaces monorepo with two packages:
         ├── routes/     health, contact
         ├── services/   emailService (nodemailer + retry)
         ├── lib/        intents, leadRef, whatsapp, format
-        └── templates/  email HTML/text (inbound, confirmation, logo)
+        └── templates/  email HTML/text (inbound, confirmation)
 ```
 
 ## Run
