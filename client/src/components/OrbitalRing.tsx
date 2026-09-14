@@ -127,9 +127,12 @@ const pickStarHue = (rand: () => number): number => {
 
 const BAND_ROTATIONS = [0, 60, -60];
 const PLANE_SQUASH = 0.157 / 0.405; // cos(inclination) of the projected orbit plane (~67 deg)
-const ORBIT_SPEED: Record<"majestic" | "lively", number> = { majestic: 1, lively: 0.45 };
-// Kepler's 3rd law: P = K * a^1.5 (K absorbs 2*pi/sqrt(G*M)); ~29s at a=0.405.
-// NOTE: time is compressed for an interactive hero; the Kepler ratios are exact.
+const ORBIT_SPEED: Record<"majestic" | "lively", number> = { majestic: 1.6, lively: 0.45 };
+// Kepler's 3rd law: P = K * a^1.5 (K absorbs 2*pi/sqrt(G*M)); ~47s at a=0.405.
+// Layout reads as a reduced solar system: guide ring a=0.425 ~= 30 AU (Neptune/Kuiper),
+// main stars a=0.38-0.43 ~= 27-30 AU, comet a=0.30 ~= 21 AU, dust a=0.05-0.18 ~= 3.5-13 AU
+// (asteroid belt to Uranus). Clock is uniformly compressed (~1e8:1) so the outer ring laps
+// in ~47s instead of ~165 yrs; the P^2 ~ a^3 ratios are exact Newtonian two-body physics.
 const PERIOD_K = 112.5;
 
 // Constellation pattern-change transition. "crossfade" dissolves the old figure
@@ -172,18 +175,37 @@ const SNAP_RAMP_MIN = 0.6; // snap crescendo: k-th edge fires at EDGE_PULSE_PEAK
 // down so the completion surge after drawP=1 reads as a breath-release.
 const COIL_START = 0.7; // easeDrawP where the coil window opens
 const COIL_DIP = 0.9; // star opacity held to this multiple during the window
-const NEBULA_BREATH = 0.3; // settled halo shimmer: NEBULA_OP x (1 + NEBULA_BREATH * sin)
+// Living nebula (scotopic, "through the eyepiece"): three layers on the same
+// centroid — a dim far envelope (averted-vision edge), a bright silver→teal
+// OIII core, and a dark star hollow (Fish's-Mouth cavity). See -nebula-env /
+// -nebula-core filter defs + the Element Map vocabulary.
+const NEBULA_BREATH = 0.3; // settled halo shimmer (all layers): x (1 + NEBULA_BREATH * sin)
 const NEBULA_BREATH_PERIOD = 3.0; // s per full neon breath cycle
-// Living nebula: JS-driven feTurbulence drift on the ambient wash (see -nebula filter).
-// Living nebula: cloud-mask filter on the ambient wash (see -nebula filter def).
-const NEBULA_TURB_FREQ = 0.02; // baseFrequency center, primary axis (cloud puff size)
-const NEBULA_TURB_RATIO = 1.6; // secondary axis = FREQ * RATIO (wider-than-tall soft horizontal drift)
-const NEBULA_TURB_AMP = 0.001; // sine amplitude around the center (barely-there drift on the 10s cycle)
-const NEBULA_TURB_PERIOD = 10; // s per full frequency drift cycle
-// Ambient nebula wash: soft halo under the settled figure (and a weak one while drawing).
-const WASH_OP_FULL = 0.12; // settled underlay opacity multiplier (cap WASH_OP_CAP)
-const WASH_OP_DRAWING = 0.06; // half-strength wash while strokes are still arriving
-const WASH_OP_CAP = 0.22; // hard ceiling on wash opacity
+const NEBULA_TURB_FREQ = 0.02; // envelope cloud baseFrequency center, primary axis
+const NEBULA_TURB_RATIO = 1.6; // envelope secondary axis = FREQ * RATIO (soft horizontal drift)
+const NEBULA_TURB_AMP = 0.001; // slow sine amplitude around the center (10s cycle)
+const NEBULA_TURB_PERIOD = 10; // s per full slow frequency-drift cycle
+const NEBULA_TURB_CADENCE = 15; // only rewrite baseFrequency every N frames (~250ms) — the slow sine is imperceptible between writes, and animated feTurbulence was boiling into flicker
+const NEBULA_LACE_OCTAVES = 3; // core cloud octaves — filaments inside the bright heart (5 created near-pixel grain)
+const NEBULA_LANE_FREQ = 0.055; // dark dust-lane turbulence center freq (Fish's-Mouth threads)
+const NEBULA_LANE_RATIO = 2.4; // lane anisotropy — silk-thin, strongly directional dust
+const NEBULA_LANE_SEED = 23; // lane noise seed (decoupled from the cloud drift)
+// Wash geometry/brightness. Envelope = bbox x ENV_BOX, Core = bbox x CORE_BOX, Hollow = bbox x HOLLOW_BOX.
+const WASH_ENV_BOX = 1.75; // far halo extends well past the figure (averted-vision range)
+const WASH_CORE_BOX = 1.1; // bright heart hugs the drawn strokes
+const WASH_HOLLOW_BOX = 0.35; // dark cavity right around the figure centroid (Trapezium hollow)
+const WASH_ENV_OP = 0.08; // settled envelope opacity (dim — the faint outer rim)
+const WASH_CORE_OP = 0.13; // settled core opacity (silver→teal heart)
+const WASH_HOLLOW_OP = 0.5; // cavity peak opacity (quiet ink shadow)
+const WASH_DRAWING_RATIO = 0.5; // while strokes arrive, all layers sit at this fraction of full
+const WASH_CORE_BLOOM = 0.55; // completion bloom on the core = x (1 + PULSE_PEAK * bloom * pulse)
+const ANCHOR_PULL = 0.15; // core heart drifts toward the live anchor star (the ionising region)
+// Dark-adaptation gains (rhodopsin): once the figure first settles, the core
+// brightens fast and the envelope creeps up slowly. Persistent per mount — so
+// re-rolls never make the night-sky "blink".
+const ADAPT_ENV_TIME = 6; // s for the envelope to reach full strength
+const ADAPT_ENV_FLOOR = 0.55; // envelope floor while a re-roll redraws (never fully blinks)
+const ADAPT_CORE_TIME = 1.5; // s for the core to reach full strength
 const DRAIN_BOOST = 0.6; // outgoing light-drain bloom relative to retract alpha
 const TIP_LEAD = 0.05; // pen-tip bright head rides ahead of the stroke front
 const TIP_OP = 0.35; // pen-tip peak opacity
@@ -215,6 +237,21 @@ const ION_RATIO = 0.28; // straight ion tail length as fraction of size
 const ION_ABERRATION = 0.06; // ion tail deviates from exact anti-solar by solar-wind aberration (rad)
 const ION_KINK = 0.16; // slow kink amplitude (rad) from draped interplanetary-field structure
 const ION_KINK_PERIOD = 9; // seconds per kink cycle
+
+// Above this rolling-average frame interval the rAF loop paints every other
+// frame (~30fps) — extreme panic fallback only; normal phones should not trip.
+const SLOW_FRAME_MS = 40;
+
+// Hostile-path throttles (quality-preserving, research-backed): the comet
+// re-solves ~210 Kepler orbits per frame, and SVG-on-SVG filters run on the CPU
+// main thread (Chromium image-filters) — the nebula re-rasterises at the full
+// filter-region cost every time its geometry *or* opacity changes. The static-
+// smoke model below cuts both without visible change: filtered geometry is fixed
+// once per roll, turbulence freezes at settle, and only unwrapped <g> CSS
+// transforms carry the motion (compositor-promoted, never re-filtered).
+const COMET_SUB_STEP = 3; // recompute dust lanes every 3rd frame (~20Hz solve)
+const FIG_SUB_STEP = 2; // settled figure (no transitions/pulses) paints every 2nd frame (~30Hz)
+const FIG_SETTLE_S = 1.2; // s after a roll before figure painting may sub-step (covers draw-in, completion pulse, edge snaps, echo burst)
 const SODIUM_RATIO = 1.5; // neutral sodium tail ~1.5x the ion tail length (NEOWISE/Hale-Bopp)
 const SODIUM_KINK = 0.4; // Na atoms deflect less than ions → dampened share of the ion kink
 const SODIUM_OP = 0.055; // very faint — only bright comets show it
@@ -236,10 +273,53 @@ const LANE_W = [0.005, 0.007, 0.009, 0.011, 0.008, 0.006];
 const LANE_OP = [0.035, 0.07, 0.119, 0.14, 0.091, 0.056];
 const LANE_FILTER = ["haloblur", "haloblur", "midblur", "midblur", "midblur", "coreblur"];
 
-function keplerSolve(M: number, e: number): number {
-  let E = M + e * Math.sin(M);
-  for (let i = 0; i < 5; i++) E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+/* Per-frame geometry is written straight to the DOM; skip a write when the
+   rounded value is unchanged (sub-pixel motion) to cut attribute churn. */
+const attrCache = new WeakMap<Element, Map<string, string>>();
+function setAttr(el: Element | null, name: string, value: string): void {
+  if (!el) return;
+  let m = attrCache.get(el);
+  if (!m) {
+    m = new Map();
+    attrCache.set(el, m);
+  }
+  if (m.get(name) === value) return;
+  m.set(name, value);
+  el.setAttribute(name, value);
+}
+
+/* Newton iterates on the eccentric anomaly; seeded from the previous frame's
+   solution per orbit (WeakMap keyed by the stable orbit object) it converges in
+   one or two passes instead of a fixed five. */
+const keplerSeedCache = new WeakMap<object, number>();
+function keplerSolve(M: number, e: number, seed?: number): number {
+  let E = seed ?? M + e * Math.sin(M);
+  for (let i = 0; i < 4; i++) {
+    const f = E - e * Math.sin(E) - M;
+    E -= f / (1 - e * Math.cos(E));
+    if (Math.abs(f) < 1e-7) break;
+  }
   return E;
+}
+
+/* Constant per-comet grain orbits (a/(1−β)), memoised so the Kepler seed cache
+   keyed by orbit identity survives across frames. */
+const grainOrbitCache = new WeakMap<Orbit, Orbit[]>();
+function grainOrbitsFor(o: Orbit): Orbit[] {
+  let arr = grainOrbitCache.get(o);
+  if (!arr) {
+    arr = [...BETA_LADDER, BLOWOUT_BETA].map((beta) => ({
+      a: o.a / (1 - beta),
+      e: o.e + beta * 0.3,
+      omega: o.omega,
+      M0: 0,
+      theta: o.theta,
+      p: o.p,
+      P: 0,
+    }));
+    grainOrbitCache.set(o, arr);
+  }
+  return arr;
 }
 
 function orbitScreenPos(
@@ -248,7 +328,9 @@ function orbitScreenPos(
   cx: number,
   cy: number,
 ): [number, number] {
-  const E = keplerSolve(M, o.e);
+  const seed = keplerSeedCache.get(o as object);
+  const E = keplerSolve(M, o.e, seed);
+  keplerSeedCache.set(o as object, E);
   const r = o.a * (1 - o.e * Math.cos(E));
   const nu = 2 * Math.atan2(
     Math.sqrt(1 + o.e) * Math.sin(E / 2),
@@ -280,20 +362,26 @@ function cometGeometry(
 ): CometGeo {
   const head: [number, number] = orbitScreenPos(o, M, cx, cy);
 
-  const grainPoint = (beta: number, k: number): [number, number] => {
+  const grainOrbits = grainOrbitsFor(o);
+
+  // Emission point (nucleus at epoch k) is independent of β — solve once per k.
+  const emitByK: [number, number][] = new Array(EPOCHS);
+  for (let k = 0; k < EPOCHS; k++) {
+    emitByK[k] = orbitScreenPos(o, M - k * EPOCH_LAG, cx, cy);
+  }
+
+  const grainPoint = (bi: number, beta: number, k: number): [number, number] => {
     const dM = k * EPOCH_LAG;
-    const aG = o.a / (1 - beta);
-    const eG = o.e + beta * 0.3;
     const Mg = M - dM * (1 - Math.pow(1 - beta, 1.5));
-    const emit = orbitScreenPos(o, M - dM, cx, cy);
-    const g = orbitScreenPos({ a: aG, e: eG, omega: o.omega, theta: o.theta, p: o.p }, Mg, cx, cy);
+    const g = orbitScreenPos(grainOrbits[bi], Mg, cx, cy);
+    const emit = emitByK[k];
     return [head[0] + (g[0] - emit[0]), head[1] + (g[1] - emit[1])];
   };
 
   const lanes: [number, number][][] = BETA_LADDER.map((beta, lane) => {
     const pts: [number, number][] = [];
     for (let k = 0; k < EPOCHS; k++) {
-      const [x, y] = grainPoint(beta, k);
+      const [x, y] = grainPoint(lane, beta, k);
       const jx = Math.sin(k * 12.9898 + lane * 78.233) * EJECT_JITTER * size * Math.max(beta, 0.03);
       const jy = Math.cos(k * 39.7101 + lane * 27.439) * EJECT_JITTER * size * Math.max(beta, 0.03);
       pts.push([x + jx, y + jy]);
@@ -303,7 +391,7 @@ function cometGeometry(
 
   const blowout: [number, number][] = [];
   for (let k = 0; k < 12; k++) {
-    blowout.push(grainPoint(BLOWOUT_BETA, k));
+    blowout.push(grainPoint(BETA_LADDER.length, BLOWOUT_BETA, k));
   }
 
   const [hx, hy] = head;
@@ -501,7 +589,18 @@ export default function OrbitalRing({
   const constellationGlowRefs = useRef<(SVGLineElement | null)[]>([]);
   const constellationGlowOutRefs = useRef<(SVGLineElement | null)[]>([]);
   const constellationWashRef = useRef<SVGEllipseElement | null>(null);
+  const constellationCoreWashRef = useRef<SVGEllipseElement | null>(null);
+  const constellationHollowRef = useRef<SVGEllipseElement | null>(null);
   const washTurbRef = useRef<SVGFETurbulenceElement | null>(null);
+  const washCoreTurbRef = useRef<SVGFETurbulenceElement | null>(null);
+  const turbFrameRef = useRef(0);
+  const washWrapRef = useRef<SVGGElement | null>(null);
+  const coreWrapRef = useRef<SVGGElement | null>(null);
+  const hollowWrapRef = useRef<SVGGElement | null>(null);
+  const turbActiveRef = useRef(false);
+  const figSubRef = useRef(0);
+  const adaptStartRef = useRef(-1);
+  const adaptDoneRef = useRef(false);
   const igniteRef = useRef<Float32Array | null>(null);
   const igniteTargetRef = useRef<Float32Array | null>(null);
   const igniteVelRef = useRef<Float32Array | null>(null);
@@ -752,8 +851,10 @@ export default function OrbitalRing({
       }
     }
 
-    const wash = constellationWashRef.current;
-    if (wash) {
+    const envWrap = washWrapRef.current;
+    const coreWrap = coreWrapRef.current;
+    const hollowWrap = hollowWrapRef.current;
+    if (envWrap && coreWrap && hollowWrap) {
       if (c && !instant && drawOn && drawP > 0 && c.edges.length > 0) {
         let minX = Infinity;
         let minY = Infinity;
@@ -773,24 +874,112 @@ export default function OrbitalRing({
           if (paB[1] > maxY) maxY = paB[1];
         }
         if (isFinite(minX) && isFinite(minY)) {
-          const wcx = (minX + maxX) / 2;
-          const wcy = (minY + maxY) / 2;
-          const wrx = Math.max(size * 0.05, ((maxX - minX) / 2) * 1.35);
-          const wry = Math.max(size * 0.05, ((maxY - minY) / 2) * 1.35);
+          const bw = maxX - minX;
+          const bh = maxY - minY;
+          const wcx = minX + bw / 2;
+          const wcy = minY + bh / 2;
+          // Anchor-pull the bright heart toward the live anchor star — the ionising cluster.
+          const ap = pos[c.anchor];
+          const hcx = ap ? wcx + (ap[0] - wcx) * ANCHOR_PULL : wcx;
+          const hcy = ap ? wcy + (ap[1] - wcy) * ANCHOR_PULL : wcy;
           const wBreath = 1 + NEBULA_BREATH * Math.sin((2 * Math.PI * t) / NEBULA_BREATH_PERIOD);
           const settled = drawP >= 1;
           const wProgress = settled ? 1 : Math.min(1, drawP * 2);
-          const wFactor = settled ? WASH_OP_FULL : WASH_OP_DRAWING;
-          wash.setAttribute("cx", wcx.toFixed(2));
-          wash.setAttribute("cy", wcy.toFixed(2));
-          wash.setAttribute("rx", wrx.toFixed(2));
-          wash.setAttribute("ry", wry.toFixed(2));
-          wash.setAttribute("opacity", Math.min(WASH_OP_CAP, wFactor * wProgress * wBreath * a).toFixed(3));
+          const drawingScale = settled ? 1 : WASH_DRAWING_RATIO;
+          // Dark adaptation (rhodopsin): on first settle the core opens fast, the
+          // envelope creeps up slowly. Persistent per mount, so re-rolls never blink.
+          if (!adaptDoneRef.current && settled) {
+            if (adaptStartRef.current < 0) adaptStartRef.current = t;
+            if ((t - adaptStartRef.current) / ADAPT_ENV_TIME >= 1) adaptDoneRef.current = true;
+          }
+          const adaptT = adaptDoneRef.current
+            ? 1
+            : adaptStartRef.current < 0 || !settled
+              ? 0
+              : Math.min(1, (t - adaptStartRef.current) / ADAPT_ENV_TIME);
+          const envAdapt = easeInOutCubic(adaptT);
+          const coreAdapt = settled
+            ? easeInOutCubic(Math.min(1, adaptT / (ADAPT_CORE_TIME / ADAPT_ENV_TIME)))
+            : 0;
+          const envFloor = settled ? 1 : ADAPT_ENV_FLOOR;
+          const envOp = WASH_ENV_OP * drawingScale * wProgress * wBreath * a * envAdapt * envFloor;
+          const coreOp =
+            WASH_CORE_OP *
+            drawingScale *
+            wProgress *
+            wBreath *
+            a *
+            (0.25 + 0.75 * coreAdapt) *
+            (1 + pulseRef.current * WASH_CORE_BLOOM);
+          const hollowOp = WASH_HOLLOW_OP * wBreath * a;
+
+          // Turbulence freeze-at-settle: while cloud-drift is live the filters
+          // re-rasterise on the cadence (~4x/s). Once the figure has settled AND
+          // adapted, stop rewriting entirely — the last baseFrequency phase holds
+          // forever (static smoke, per the user-approved tier-3 plan). A re-roll
+          // re-arms the drift in rollConstellation.
+          if (settled && adaptDoneRef.current && turbActiveRef.current) turbActiveRef.current = false;
+
+          // Composited motion only: geometry was fixed by setWashArt at the roll.
+          // These per-frame writes are CSS transforms/opacity on the unwrapped
+          // filter layer → Chromium promotes the layer to the compositor, so the
+          // nebula NEVER re-rasterises on the idle/breath path.
+          envWrap.style.transform = `translate(${wcx.toFixed(2)}px,${wcy.toFixed(2)}px)`;
+          coreWrap.style.transform = `translate(${hcx.toFixed(2)}px,${hcy.toFixed(2)}px)`;
+          hollowWrap.style.transform = `translate(${wcx.toFixed(2)}px,${wcy.toFixed(2)}px)`;
+          envWrap.style.opacity = Math.min(WASH_ENV_OP, envOp).toFixed(3);
+          coreWrap.style.opacity = Math.min(WASH_CORE_OP, coreOp).toFixed(3);
+          hollowWrap.style.opacity = Math.min(WASH_HOLLOW_OP, hollowOp).toFixed(3);
         }
       } else {
-        wash.setAttribute("opacity", "0");
+        envWrap.style.opacity = "0";
+        coreWrap.style.opacity = "0";
+        hollowWrap.style.opacity = "0";
       }
     }
+    },
+    [size],
+  );
+
+  // Static-smoke geometry: the filtered wash ellipses are centred on the local
+  // origin and sized exactly once per roll (final figure bbox). From here on the
+  // rAF loop never touches their geometry — the nebula re-rasterises only when a
+  // NEW figure rolls, and all motion is carried by the composited wrapper
+  // translates/opacity in paintConstellation.
+  const setWashArt = useCallback(
+    (edges: Array<[number, number]>, pos: [number, number][]) => {
+      const wash = constellationWashRef.current;
+      const coreWash = constellationCoreWashRef.current;
+      const hollow = constellationHollowRef.current;
+      if (!wash || !coreWash || !hollow) return;
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (let ei = 0; ei < edges.length; ei++) {
+        const paA = pos[edges[ei][0]];
+        const paB = pos[edges[ei][1]];
+        if (!paA || !paB) continue;
+        if (paA[0] < minX) minX = paA[0];
+        if (paB[0] < minX) minX = paB[0];
+        if (paA[0] > maxX) maxX = paA[0];
+        if (paB[0] > maxX) maxX = paB[0];
+        if (paA[1] < minY) minY = paA[1];
+        if (paB[1] < minY) minY = paB[1];
+        if (paA[1] > maxY) maxY = paA[1];
+        if (paB[1] > maxY) maxY = paB[1];
+      }
+      if (!isFinite(minX) || !isFinite(minY)) return;
+      const bw = maxX - minX;
+      const bh = maxY - minY;
+      const baseRx = Math.max(size * 0.05, bw / 2);
+      const baseRy = Math.max(size * 0.05, bh / 2);
+      setAttr(wash, "rx", (baseRx * WASH_ENV_BOX).toFixed(2));
+      setAttr(wash, "ry", (baseRy * WASH_ENV_BOX).toFixed(2));
+      setAttr(coreWash, "rx", (baseRx * WASH_CORE_BOX).toFixed(2));
+      setAttr(coreWash, "ry", (baseRy * WASH_CORE_BOX).toFixed(2));
+      setAttr(hollow, "rx", (baseRx * WASH_HOLLOW_BOX).toFixed(2));
+      setAttr(hollow, "ry", (baseRy * WASH_HOLLOW_BOX).toFixed(2));
     },
     [size],
   );
@@ -799,85 +988,113 @@ export default function OrbitalRing({
     if (!interactive || !comet || reducedEff) return;
     const t0 = performance.now();
     let raf = 0;
+    let running = false;
+    let pausedMs = 0;
+    let pauseBegan = 0;
+    let last = 0;
+    let ema = 16.7;
+    let skip = false;
+    let cometSub = 0;
 
     const frame = (now: number) => {
-      const t = (now - t0) / 1000;
+      const dt = last ? now - last : 16.7;
+      last = now;
+      ema = ema * 0.9 + dt * 0.1;
+      // Adaptive cadence: extreme panic only — if a device averages >40ms per
+      // frame, paint every other frame to halve GPU pressure.  Normal phones
+      // never trip this; sub-stepping handles the rest.
+      if (ema > SLOW_FRAME_MS) {
+        skip = !skip;
+        if (skip) {
+          raf = requestAnimationFrame(frame);
+          return;
+        }
+      } else {
+        skip = false;
+      }
+      const t = (now - t0 - pausedMs) / 1000;
       timeRef.current = t;
       const M = comet.M0 + (2 * Math.PI * t) / comet.P;
 
-      const geo = cometGeometry(comet, M, cx, cy, size, (2 * Math.PI * t) / ION_KINK_PERIOD);
-      const boost = Math.min(1.35, Math.max(0.6, 0.55 + geo.rRatio * 0.45));
+      // Sub-step: recompute AND rewrite the comet only every COMET_SUB_STEP
+      // frames. At a ~29s orbital period the single-frame lag is sub-pixel, but
+      // it halves the ~210 Kepler dust solves and the lane-string building.
+      if (cometSub++ % COMET_SUB_STEP === 0) {
+        const geo = cometGeometry(comet, M, cx, cy, size, (2 * Math.PI * t) / ION_KINK_PERIOD);
+        const boost = Math.min(1.35, Math.max(0.6, 0.55 + geo.rRatio * 0.45));
 
-      if (headRef.current) {
-        headRef.current.setAttribute("transform", `translate(${geo.head[0].toFixed(2)},${geo.head[1].toFixed(2)})`);
-        headRef.current.setAttribute("opacity", cometHeadOpacity(geo.rRatio).toFixed(3));
-      }
-      const laneEls = laneRefs.current;
-      for (let i = 0; i < laneEls.length; i++) {
-        const el = laneEls[i];
-        if (el) {
-          el.setAttribute("points", geo.lanes[i].map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" "));
-          el.setAttribute("opacity", (LANE_OP[i] * boost).toFixed(3));
+        if (headRef.current) {
+          headRef.current.style.transform = `translate(${geo.head[0].toFixed(2)}px,${geo.head[1].toFixed(2)}px)`;
+          setAttr(headRef.current, "opacity", cometHeadOpacity(geo.rRatio).toFixed(3));
         }
-      }
-      if (blowoutRef.current) {
-        blowoutRef.current.setAttribute(
-          "points",
-          geo.blowout.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" "),
-        );
-      }
-      if (fanPathRef.current) {
-        fanPathRef.current.setAttribute("d", fanPath(geo));
-        fanPathRef.current.setAttribute("opacity", (0.1 * boost).toFixed(3));
-      }
-      if (fanGradRef.current) {
-        const gx = geo.head[0];
-        const gy = geo.head[1];
-        const gL = Math.hypot(cx - gx, cy - gy) || 1;
-        fanGradRef.current.setAttribute("x1", gx.toFixed(2));
-        fanGradRef.current.setAttribute("y1", gy.toFixed(2));
-        fanGradRef.current.setAttribute("x2", (gx + ((cx - gx) / gL) * 0.42 * size).toFixed(2));
-        fanGradRef.current.setAttribute("y2", (gy + ((cy - gy) / gL) * 0.42 * size).toFixed(2));
-        fanGradRef.current.setAttribute("opacity", (0.1 * boost).toFixed(3));
-      }
+        const laneEls = laneRefs.current;
+        for (let i = 0; i < laneEls.length; i++) {
+          const el = laneEls[i];
+          if (el) {
+            setAttr(el, "points", geo.lanes[i].map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" "));
+            setAttr(el, "opacity", (LANE_OP[i] * boost).toFixed(3));
+          }
+        }
+        if (blowoutRef.current) {
+          setAttr(
+            blowoutRef.current,
+            "points",
+            geo.blowout.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" "),
+          );
+        }
+        if (fanPathRef.current) {
+          setAttr(fanPathRef.current, "d", fanPath(geo));
+          setAttr(fanPathRef.current, "opacity", (0.1 * boost).toFixed(3));
+        }
+        if (fanGradRef.current) {
+          const gx = geo.head[0];
+          const gy = geo.head[1];
+          const gL = Math.hypot(cx - gx, cy - gy) || 1;
+          setAttr(fanGradRef.current, "x1", gx.toFixed(2));
+          setAttr(fanGradRef.current, "y1", gy.toFixed(2));
+          setAttr(fanGradRef.current, "x2", (gx + ((cx - gx) / gL) * 0.42 * size).toFixed(2));
+          setAttr(fanGradRef.current, "y2", (gy + ((cy - gy) / gL) * 0.42 * size).toFixed(2));
+          setAttr(fanGradRef.current, "opacity", (0.1 * boost).toFixed(3));
+        }
 
-      const comag = comaglowRef.current;
-      if (comag) {
-        const hx = geo.head[0];
-        const hy = geo.head[1];
-        const sdl = Math.hypot(cx - hx, cy - hy) || 1;
-        const shx = hx + ((cx - hx) / sdl) * size * 0.02;
-        const shy = hy + ((cy - hy) / sdl) * size * 0.02;
-        comag.setAttribute("cx", hx.toFixed(2));
-        comag.setAttribute("cy", hy.toFixed(2));
-        comag.setAttribute("fx", shx.toFixed(2));
-        comag.setAttribute("fy", shy.toFixed(2));
-      }
+        const comag = comaglowRef.current;
+        if (comag) {
+          const hx = geo.head[0];
+          const hy = geo.head[1];
+          const sdl = Math.hypot(cx - hx, cy - hy) || 1;
+          const shx = hx + ((cx - hx) / sdl) * size * 0.02;
+          const shy = hy + ((cy - hy) / sdl) * size * 0.02;
+          setAttr(comag, "cx", hx.toFixed(2));
+          setAttr(comag, "cy", hy.toFixed(2));
+          setAttr(comag, "fx", shx.toFixed(2));
+          setAttr(comag, "fy", shy.toFixed(2));
+        }
 
-      const ion = ionLineRefs.current;
-      if (ion[0]) {
-        ion[0].setAttribute("x1", geo.head[0].toFixed(2));
-        ion[0].setAttribute("y1", geo.head[1].toFixed(2));
-        ion[0].setAttribute("x2", geo.ionEnd[0].toFixed(2));
-        ion[0].setAttribute("y2", geo.ionEnd[1].toFixed(2));
-      }
-      if (ion[1]) {
-        ion[1].setAttribute("x1", geo.head[0].toFixed(2));
-        ion[1].setAttribute("y1", geo.head[1].toFixed(2));
-        ion[1].setAttribute("x2", geo.ionEnd[0].toFixed(2));
-        ion[1].setAttribute("y2", geo.ionEnd[1].toFixed(2));
-      }
-      if (sodiumRef.current) {
-        sodiumRef.current.setAttribute("x1", geo.head[0].toFixed(2));
-        sodiumRef.current.setAttribute("y1", geo.head[1].toFixed(2));
-        sodiumRef.current.setAttribute("x2", geo.sodiumEnd[0].toFixed(2));
-        sodiumRef.current.setAttribute("y2", geo.sodiumEnd[1].toFixed(2));
-      }
+        const ion = ionLineRefs.current;
+        if (ion[0]) {
+          setAttr(ion[0], "x1", geo.head[0].toFixed(2));
+          setAttr(ion[0], "y1", geo.head[1].toFixed(2));
+          setAttr(ion[0], "x2", geo.ionEnd[0].toFixed(2));
+          setAttr(ion[0], "y2", geo.ionEnd[1].toFixed(2));
+        }
+        if (ion[1]) {
+          setAttr(ion[1], "x1", geo.head[0].toFixed(2));
+          setAttr(ion[1], "y1", geo.head[1].toFixed(2));
+          setAttr(ion[1], "x2", geo.ionEnd[0].toFixed(2));
+          setAttr(ion[1], "y2", geo.ionEnd[1].toFixed(2));
+        }
+        if (sodiumRef.current) {
+          setAttr(sodiumRef.current, "x1", geo.head[0].toFixed(2));
+          setAttr(sodiumRef.current, "y1", geo.head[1].toFixed(2));
+          setAttr(sodiumRef.current, "x2", geo.sodiumEnd[0].toFixed(2));
+          setAttr(sodiumRef.current, "y2", geo.sodiumEnd[1].toFixed(2));
+        }
 
-      geo.motes.forEach(([x, y], i) => {
-        const g = moteRefs.current[i];
-        if (g) g.setAttribute("transform", `translate(${x.toFixed(2)},${y.toFixed(2)})`);
-      });
+        geo.motes.forEach(([x, y], i) => {
+          const g = moteRefs.current[i];
+          if (g) g.style.transform = `translate(${x.toFixed(2)}px,${y.toFixed(2)}px)`;
+        });
+      }
 
       const ptr = pointerRef.current;
       const loopPos: [number, number][] = new Array(stars.length);
@@ -888,7 +1105,7 @@ export default function OrbitalRing({
         loopPos[i] = [x, y];
         const g = starRefs.current[i];
         if (g) {
-          g.setAttribute("transform", `translate(${x.toFixed(2)},${y.toFixed(2)})`);
+          g.style.transform = `translate(${x.toFixed(2)}px,${y.toFixed(2)}px)`;
           const ignite = igniteRef.current?.[i] ?? 0;
           const tgt = igniteTargetRef.current?.[i] ?? 0;
           const velArr = igniteVelRef.current;
@@ -900,25 +1117,36 @@ export default function OrbitalRing({
             if (igniteRef.current) igniteRef.current[i] = ignite + vel;
           }
           const current = igniteRef.current?.[i] ?? ignite;
-          g.setAttribute("opacity", (s.base * (1 + IGNITE_BOOST * current) * coilRef.current).toFixed(3));
+          setAttr(g, "opacity", (s.base * (1 + IGNITE_BOOST * current) * coilRef.current).toFixed(3));
         }
         const line = lineRefs.current[i];
         if (line) {
           if (!ptr) {
-            line.setAttribute("opacity", "0");
+            setAttr(line, "opacity", "0");
             continue;
           }
           const d = Math.hypot(ptr.x - x, ptr.y - y);
           const a = d <= reactRadius && d > 0.01 ? Math.pow(1 - d / reactRadius, 2) * 0.8 : 0;
-          line.setAttribute("x1", x.toFixed(2));
-          line.setAttribute("y1", y.toFixed(2));
-          line.setAttribute("x2", ptr.x.toFixed(2));
-          line.setAttribute("y2", ptr.y.toFixed(2));
-          line.setAttribute("opacity", a.toFixed(3));
+          setAttr(line, "x1", x.toFixed(2));
+          setAttr(line, "y1", y.toFixed(2));
+          setAttr(line, "x2", ptr.x.toFixed(2));
+          setAttr(line, "y2", ptr.y.toFixed(2));
+          setAttr(line, "opacity", a.toFixed(3));
         }
       }
 
-      paintConstellation(ptr, loopPos);
+      // Settled figure sub-step: once no transition is running and the post-roll
+      // pulses/echo have lapsed, paint every 2nd frame (~30Hz). The fade/breath
+      // smoothness loss is imperceptible and it halves the settled figure's
+      // filter-pass cost (the filtered haloblur glows).
+      const cstFig = constellationStateRef.current;
+      const figSettled =
+        cstFig !== null && !constellationOutRef.current && t - cstFig.drawnAt > FIG_SETTLE_S;
+      if (figSettled) {
+        if (figSubRef.current++ % FIG_SUB_STEP === 0) paintConstellation(ptr, loopPos);
+      } else {
+        paintConstellation(ptr, loopPos);
+      }
 
       // Anchor echo flare: 3-dot secondary sparkle flying out from the anchor as the burst fades.
       const echo = constellationEchoRef.current;
@@ -927,7 +1155,7 @@ export default function OrbitalRing({
           const cst = constellationStateRef.current;
           const ap = cst ? loopPos[cst.anchor] : null;
           if (ap) {
-            echo.setAttribute("transform", `translate(${ap[0].toFixed(2)},${ap[1].toFixed(2)})`);
+            echo.style.transform = `translate(${ap[0].toFixed(2)}px,${ap[1].toFixed(2)}px)`;
             const be = burstRef.current;
             const dir = [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3];
             for (let i = 0; i < echoDotRefs.current.length; i++) {
@@ -947,9 +1175,19 @@ export default function OrbitalRing({
         }
       }
 
-      if (washTurbRef.current) {
+      if (
+        turbActiveRef.current &&
+        (washTurbRef.current || washCoreTurbRef.current) &&
+        turbFrameRef.current++ % NEBULA_TURB_CADENCE === 0
+      ) {
         const f = NEBULA_TURB_FREQ + NEBULA_TURB_AMP * Math.sin((2 * Math.PI * t) / NEBULA_TURB_PERIOD);
-        washTurbRef.current.setAttribute("baseFrequency", `${f.toFixed(5)} ${(f * NEBULA_TURB_RATIO).toFixed(5)}`);
+        if (washTurbRef.current) {
+          washTurbRef.current.setAttribute("baseFrequency", `${f.toFixed(5)} ${(f * NEBULA_TURB_RATIO).toFixed(5)}`);
+        }
+        if (washCoreTurbRef.current) {
+          const fc = NEBULA_TURB_FREQ * 1.5 + NEBULA_TURB_AMP * Math.sin((2 * Math.PI * t) / NEBULA_TURB_PERIOD);
+          washCoreTurbRef.current.setAttribute("baseFrequency", `${fc.toFixed(5)} ${(fc * NEBULA_TURB_RATIO).toFixed(5)}`);
+        }
       }
 
       if (pulseRef.current > 0) {
@@ -966,13 +1204,47 @@ export default function OrbitalRing({
       raf = requestAnimationFrame(frame);
     };
 
-    raf = requestAnimationFrame(frame);
-    return () => {
-      cancelAnimationFrame(raf);
+    const start = () => {
+      if (running) return;
+      running = true;
+      if (pauseBegan) {
+        pausedMs += performance.now() - pauseBegan;
+        pauseBegan = 0;
+      }
+      last = 0;
+      ema = 16.7;
+      skip = false;
+      raf = requestAnimationFrame(frame);
+    };
+    const stop = () => {
+      if (!running) return;
+      running = false;
+      pauseBegan = performance.now();
+      if (raf) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
       if (dwellRef.current) {
         clearTimeout(dwellRef.current);
         dwellRef.current = null;
       }
+    };
+
+    // Pause the whole simulation when the ring scrolls out of view — the single
+    // biggest always-on drain, and invisible by definition (it's off-screen).
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) start();
+        else stop();
+      },
+      { threshold: 0 },
+    );
+    if (wrapRef.current) io.observe(wrapRef.current);
+    start();
+
+    return () => {
+      io.disconnect();
+      stop();
     };
   }, [stars, comet, reducedEff, interactive, cx, cy, reactRadius, size, paintConstellation]);
 
@@ -1119,6 +1391,10 @@ export default function OrbitalRing({
     burstRef.current = 1;
     pulseFiredRef.current = false;
     edgePulseRef.current = new Float32Array(edges.length);
+    // Static smoke + drift re-arm: fix the filtered wash geometry for this figure
+    // and resume the slow cloud-drift (paintConstellation freezes it at settle).
+    turbActiveRef.current = true;
+    setWashArt(edges, pos);
     if (constellationLabelRef.current) {
       constellationLabelRef.current.textContent = entry.name.toUpperCase();
     }
@@ -1210,6 +1486,8 @@ export default function OrbitalRing({
     if (edgePulseRef.current) edgePulseRef.current.fill(0);
     coilRef.current = 1;
     burstRef.current = 0;
+    turbFrameRef.current = 0;
+    turbActiveRef.current = false;
     if (constellationEchoRef.current) constellationEchoRef.current.setAttribute("opacity", "0");
     if (dwellRef.current) {
       clearTimeout(dwellRef.current);
@@ -1227,7 +1505,7 @@ export default function OrbitalRing({
     <div
       ref={wrapRef}
       className={className}
-      style={{ maxWidth: size, width: "100%", marginInline: "auto", position: "relative" }}
+      style={{ maxWidth: size, width: "100%", marginInline: "auto", position: "relative", willChange: "transform" }}
       {...(interactive
         ? { onMouseEnter: handleEnter, onMouseMove: handleMove, onMouseLeave: handleLeave }
         : {})}
@@ -1314,9 +1592,20 @@ export default function OrbitalRing({
             </radialGradient>
           ))}
           <radialGradient id={`${id}-washglow`} colorInterpolation="linearRGB">
-            <stop offset="0%" stopColor="#9BD4FF" stopOpacity="0.8" />
-            <stop offset="55%" stopColor="#7FB8E8" stopOpacity="0.24" />
-            <stop offset="100%" stopColor="#9BD4FF" stopOpacity="0" />
+            <stop offset="0%" stopColor="#E6EDF4" stopOpacity="0.55" />
+            <stop offset="55%" stopColor="#C3D4E2" stopOpacity="0.16" />
+            <stop offset="100%" stopColor="#8FA6BF" stopOpacity="0" />
+          </radialGradient>
+          <radialGradient id={`${id}-washcoreglow`} colorInterpolation="linearRGB">
+            <stop offset="0%" stopColor="#F0F6F8" stopOpacity="0.85" />
+            <stop offset="38%" stopColor="#C9ECDE" stopOpacity="0.38" />
+            <stop offset="75%" stopColor="#B7CBDD" stopOpacity="0.1" />
+            <stop offset="100%" stopColor="#93A8BE" stopOpacity="0" />
+          </radialGradient>
+          <radialGradient id={`${id}-washdark`} colorInterpolation="linearRGB">
+            <stop offset="0%" stopColor="#03070C" stopOpacity="0.6" />
+            <stop offset="70%" stopColor="#09121D" stopOpacity="0.32" />
+            <stop offset="100%" stopColor="#09121D" stopOpacity="0" />
           </radialGradient>
           <filter id={`${id}-coreblur`} x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="linearRGB">
             <feGaussianBlur stdDeviation={size * tuning.coreS} />
@@ -1327,11 +1616,24 @@ export default function OrbitalRing({
           <filter id={`${id}-haloblur`} x="-30%" y="-30%" width="160%" height="160%" colorInterpolationFilters="linearRGB">
             <feGaussianBlur stdDeviation={size * tuning.haloS} />
           </filter>
-          <filter id={`${id}-nebula`} x="-100%" y="-100%" width="300%" height="300%" colorInterpolationFilters="sRGB">
+          {/* The feTurbulence noise is masked by operator="in" to the ellipse disc,
+              so a 340% filter region was generating (and discarding) ~4.5x the
+              visible area every pass. 160% still leaves >30% blur margin — the
+              visible cloud texture is bit-identical, only off-disc noise is gone. */}
+          <filter id={`${id}-nebula-env`} x="-30%" y="-30%" width="160%" height="160%" colorInterpolationFilters="sRGB">
             <feTurbulence ref={washTurbRef} type="fractalNoise" baseFrequency={NEBULA_TURB_FREQ} numOctaves="3" seed="7" result="noise" />
-            <feColorMatrix in="noise" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 8 -3" result="cloud" />
-            <feComposite in="SourceGraphic" in2="cloud" operator="in" result="washed" />
-            <feGaussianBlur in="washed" stdDeviation={size * 0.004} />
+            <feColorMatrix in="noise" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 5 -1.2" result="cloud" />
+            <feComposite in="SourceGraphic" in2="cloud" operator="in" result="env" />
+            <feGaussianBlur in="env" stdDeviation={size * 0.005} />
+          </filter>
+          <filter id={`${id}-nebula-core`} x="-30%" y="-30%" width="160%" height="160%" colorInterpolationFilters="sRGB">
+            <feTurbulence ref={washCoreTurbRef} type="fractalNoise" baseFrequency={NEBULA_TURB_FREQ * 1.5} numOctaves={NEBULA_LACE_OCTAVES} seed="7" result="noise" />
+            <feColorMatrix in="noise" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 5 -1.2" result="cloud" />
+            <feComposite in="SourceGraphic" in2="cloud" operator="in" result="core" />
+            <feTurbulence type="fractalNoise" baseFrequency={`${NEBULA_LANE_FREQ} ${(NEBULA_LANE_FREQ * NEBULA_LANE_RATIO).toFixed(5)}`} numOctaves="3" seed={NEBULA_LANE_SEED} result="laneNoise" />
+            <feColorMatrix in="laneNoise" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 6 -1.5" result="lanes" />
+            <feComposite in="core" in2="lanes" operator="out" result="carved" />
+            <feGaussianBlur in="carved" stdDeviation={size * 0.003} />
           </filter>
         </defs>
 
@@ -1589,14 +1891,35 @@ export default function OrbitalRing({
             opacity="0"
           />
         ))}
-        <ellipse
-          ref={constellationWashRef}
-          cx={0} cy={0}
-          rx={0} ry={0}
-          fill={`url(#${id}-washglow)`}
-          filter={`url(#${id}-nebula)`}
-          opacity="0"
-        />
+        <g ref={washWrapRef} style={{ opacity: 0 }}>
+          <ellipse
+            ref={constellationWashRef}
+            cx={0} cy={0}
+            rx={0} ry={0}
+            fill={`url(#${id}-washglow)`}
+            filter={`url(#${id}-nebula-env)`}
+            opacity="1"
+          />
+        </g>
+        <g ref={coreWrapRef} style={{ opacity: 0 }}>
+          <ellipse
+            ref={constellationCoreWashRef}
+            cx={0} cy={0}
+            rx={0} ry={0}
+            fill={`url(#${id}-washcoreglow)`}
+            filter={`url(#${id}-nebula-core)`}
+            opacity="1"
+          />
+        </g>
+        <g ref={hollowWrapRef} style={{ opacity: 0 }}>
+          <ellipse
+            ref={constellationHollowRef}
+            cx={0} cy={0}
+            rx={0} ry={0}
+            fill={`url(#${id}-washdark)`}
+            opacity="1"
+          />
+        </g>
         {Array.from({ length: MAX_CONSTELLATION_EDGES }, (_, i) => (
           <line
             key={`ocline-${i}`}

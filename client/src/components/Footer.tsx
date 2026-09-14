@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { openContactForm } from "../lib/contactNav";
 import allverzeLogo from "../imports/logo.webp";
 import { WHATSAPP_URL, WHATSAPP_NUMBER, PUBLIC_EMAIL } from "../config";
 
@@ -256,7 +257,7 @@ export default function Footer() {
               We'd love to hear about your project — reaching out takes one tap.
             </p>
             <button
-              onClick={() => navigate("/contact")}
+              onClick={() => openContactForm(navigate)}
               className="text-sm font-semibold text-white transition-opacity hover:opacity-85"
               style={{ background: "#0055E5", borderRadius: 9, padding: "10px 16px", boxShadow: "0 2px 10px rgba(0,85,229,0.22)" }}
             >

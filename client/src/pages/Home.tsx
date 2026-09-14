@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../theme/ThemeContext";
 import { useThemeColors } from "../theme/useThemeColors";
+import { openContactForm, openServiceModule } from "../lib/contactNav";
 import OrbitalRing from "../components/OrbitalRing";
 import ShieldIcon from "../components/ShieldIcon";
 
@@ -119,20 +120,19 @@ export default function Home() {
   const { isDark } = useTheme();
   const colors = useThemeColors();
 
-  const tagBg = colors.tagBg;
-  const tagColor = colors.tagColor;
-
   return (
     <main>
       {/* ── HERO ──────────────────────────────────────────────── */}
       <section
-        style={{ minHeight: "100vh", paddingTop: 72, background: "#0B1D35" }}
-        className="relative overflow-hidden flex items-center"
+        style={{ paddingTop: 72, background: "#0B1D35" }}
+        className="home-hero-height relative overflow-hidden flex items-center"
       >
-        {/* Layered ambient gradients */}
+        {/* Layered ambient gradients (texture system) */}
+        <div aria-hidden="true" className="crown-glow crown-glow--hero" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(160deg, rgba(0,85,229,0.10) 0%, transparent 55%)" }} />
         <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 50% at 70% 50%, rgba(56,189,248,0.06) 0%, transparent 70%)" }} />
-        <div className="absolute inset-0 pointer-events-none dot-grid" style={{ opacity: 0.45 }} />
+        <div className="absolute inset-0 pointer-events-none dot-grid dot-grid--fade" style={{ opacity: 0.55 }} />
+        <div aria-hidden="true" className="grain-iconic" />
 
         <div className="max-w-7xl mx-auto px-6 lg:px-12 w-full py-20 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div className="flex flex-col gap-6">
@@ -170,10 +170,10 @@ export default function Home() {
             <div className="flex items-center gap-3 fade-in-up fade-in-up-2">
               <span className="h-px w-10 shrink-0" style={{ background: "rgba(248,250,252,0.18)" }} />
               <span
+                className="tracking-[0.22em] sm:tracking-[0.32em]"
                 style={{
                   fontSize: "0.7rem",
                   fontWeight: 600,
-                  letterSpacing: "0.32em",
                   textTransform: "uppercase",
                   color: "rgba(248,250,252,0.48)",
                 }}
@@ -203,7 +203,7 @@ export default function Home() {
                 </svg>
               </button>
               <button
-                onClick={() => navigate("/contact")}
+                onClick={() => openContactForm(navigate)}
                 className="inline-flex items-center gap-2 text-sm font-semibold transition-all duration-150 hover:bg-white/5"
                 style={{
                   color: "rgba(248,250,252,0.80)",
@@ -250,8 +250,8 @@ export default function Home() {
           </div>
 
           <div className="flex justify-center lg:justify-end">
-            <div className="orbital-float" style={{ maxWidth: "min(420px, 82vw)", width: "100%" }}>
-              <OrbitalRing size={420} variant="constellation" speed="majestic" />
+            <div className="orbital-float" style={{ maxWidth: "min(480px, 82vw)", width: "100%" }}>
+              <OrbitalRing size={480} variant="constellation" speed="majestic" />
             </div>
           </div>
         </div>
@@ -300,23 +300,23 @@ export default function Home() {
               Four commitments, measured daily — every number is a promise we stand behind.
             </p>
           </div>
+<div
+          className="relative overflow-hidden"
+          style={{
+            background: "linear-gradient(135deg, #0B1D35 0%, #060E1A 100%)",
+            border: "1px solid rgba(56, 189, 248, 0.14)",
+            borderRadius: 28,
+            boxShadow: isDark ? "none" : "0 24px 60px rgba(2, 8, 19, 0.28)",
+          }}
+        >
           <div
-            className="relative rounded-2xl overflow-hidden"
+            aria-hidden
+            className="absolute inset-0 pointer-events-none"
             style={{
-              background: isDark ? "#0B1D35" : "#FFFFFF",
-              border: `1px solid ${isDark ? "rgba(248,250,252,0.08)" : "#E2E8F0"}`,
-              boxShadow: isDark ? "0 1px 0 rgba(255,255,255,0.04) inset" : "0 1px 2px rgba(11,29,53,0.04)",
+              background: "radial-gradient(ellipse 70% 95% at 50% 0%, rgba(56,189,248,0.14), transparent 65%)",
             }}
-          >
-            <div
-              aria-hidden
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background: isDark
-                  ? "radial-gradient(ellipse 70% 95% at 50% 0%, rgba(56,189,248,0.14), transparent 65%)"
-                  : "radial-gradient(ellipse 70% 95% at 50% 0%, rgba(0,85,229,0.07), transparent 65%)",
-              }}
-            />
+          />
+          <div aria-hidden="true" className="grain-iconic" />
             <div className="relative grid grid-cols-2 lg:flex gap-y-8">
               {metrics.map((m, i) => (
                 <Fragment key={m.stat}>
@@ -324,7 +324,7 @@ export default function Home() {
                     <div
                       aria-hidden
                       className="hidden lg:block self-center h-12 w-px shrink-0"
-                      style={{ background: isDark ? "rgba(248,250,252,0.12)" : "#E2E8F0" }}
+                      style={{ background: "rgba(248,250,252,0.12)" }}
                     />
                   )}
                   <div
@@ -333,7 +333,7 @@ export default function Home() {
                     style={{ padding: "clamp(2rem, 3.5vw, 2.6rem) 1rem" }}
                   >
                     <span
-                      className={isDark ? "stat-gradient" : "stat-gradient-light"}
+                      className="stat-gradient"
                       style={{
                         fontSize: "clamp(2rem, 4vw, 2.8rem)",
                         fontWeight: 800,
@@ -343,8 +343,8 @@ export default function Home() {
                     >
                       {m.stat}
                     </span>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.16em", color: isDark ? "#F8FAFC" : "#0B1D35", marginTop: 4 }}>{m.label}</span>
-                    <span style={{ fontSize: "0.75rem", color: isDark ? "rgba(248,250,252,0.35)" : "#64748B" }}>{m.sub}</span>
+                    <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.16em", color: "#F8FAFC", marginTop: 4 }}>{m.label}</span>
+                    <span style={{ fontSize: "0.75rem", color: "rgba(248,250,252,0.55)" }}>{m.sub}</span>
                   </div>
                 </Fragment>
               ))}
@@ -354,17 +354,19 @@ export default function Home() {
       </section>
 
       {/* ── CORE CAPABILITIES ─────────────────────────────────── */}
-      <section style={{ background: colors.pageBg, paddingTop: 100, paddingBottom: 100 }} className="px-6 lg:px-12">
-        <div className="max-w-7xl mx-auto">
+      <section style={{ background: "#0B1D35", paddingTop: 100, paddingBottom: 100 }} className="px-6 lg:px-12 relative overflow-hidden">
+        <div aria-hidden="true" className="rim-glow-r" />
+        <div aria-hidden="true" className="grain-iconic" />
+        <div className="max-w-7xl mx-auto relative">
           <div className="mb-14 max-w-xl reveal">
-            <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: "#0055E5" }}>
+            <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: "#38BDF8" }}>
               What We Do
             </p>
-            <h2 style={{ fontSize: "clamp(1.9rem, 3.5vw, 2.6rem)", fontWeight: 700, color: colors.textPrimary, letterSpacing: "-0.022em", lineHeight: 1.15 }}>
+            <h2 style={{ fontSize: "clamp(1.9rem, 3.5vw, 2.6rem)", fontWeight: 700, color: "#F8FAFC", letterSpacing: "-0.022em", lineHeight: 1.15 }}>
               Capability built for real{" "}
-              <span style={{ color: "#0055E5" }}>business momentum</span>
+              <span style={{ color: "#38BDF8" }}>business momentum</span>
             </h2>
-            <p style={{ marginTop: 12, fontSize: "0.9375rem", color: colors.textSub, lineHeight: 1.7 }}>
+            <p style={{ marginTop: 12, fontSize: "0.9375rem", color: "rgba(248,250,252,0.55)", lineHeight: 1.7 }}>
               End-to-end technology solutions built on precision engineering, not promises.
             </p>
           </div>
@@ -376,33 +378,31 @@ export default function Home() {
                 className="card-hover group reveal flex flex-col gap-5"
                 data-reveal-delay={`${i * 70}`}
                 style={{
-                  background: colors.cardBg,
-                  border: `1px solid ${colors.cardBorder}`,
+                  background: "#0E2344",
+                  border: "1px solid rgba(255,255,255,0.07)",
                   borderRadius: 14,
                   padding: "32px 32px",
-                  boxShadow: isDark
-                    ? "0 1px 4px rgba(0,0,0,0.30), 0 4px 20px rgba(0,0,0,0.18)"
-                    : "0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.04)",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.30), 0 4px 20px rgba(0,0,0,0.18)",
                   cursor: "default",
                   position: "relative",
                   overflow: "hidden",
                 }}
               >
-                {/* Subtle top-left glow accent */}
+                {/* Top gradient accent line */}
                 <div
-                  className="absolute top-0 left-0 pointer-events-none"
+                  className="absolute top-0 left-0 right-0 opacity-50 transition-opacity duration-200 group-hover:opacity-100"
                   style={{
-                    width: 120, height: 120,
-                    background: "radial-gradient(circle at 0% 0%, rgba(0,85,229,0.10) 0%, transparent 70%)",
-                    borderRadius: "0 0 120px 0",
+                    height: 2,
+                    background: "linear-gradient(90deg, #0055E5 0%, #38BDF8 50%, transparent 100%)",
+                    borderRadius: "14px 14px 0 0",
                   }}
                 />
                 <div className="flex items-start justify-between relative">
                   <div
                     style={{
-                      width: 48, height: 48, borderRadius: 11,
-                      background: "linear-gradient(135deg, rgba(0,85,229,0.14) 0%, rgba(56,189,248,0.08) 100%)",
-                      color: "#0055E5",
+                      width: 42, height: 42, borderRadius: 10,
+                      background: "linear-gradient(135deg, rgba(0,85,229,0.22) 0%, rgba(56,189,248,0.10) 100%)",
+                      color: "#38BDF8",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       flexShrink: 0,
                     }}
@@ -413,7 +413,7 @@ export default function Home() {
                   <span
                     style={{
                       fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.12em",
-                      textTransform: "uppercase", color: tagColor, background: tagBg,
+                      textTransform: "uppercase", color: "#38BDF8", background: "rgba(56,189,248,0.10)",
                       borderRadius: 5, padding: "3px 10px",
                     }}
                   >
@@ -422,18 +422,18 @@ export default function Home() {
                 </div>
 
                 <div className="relative">
-                  <h3 style={{ fontSize: "1.075rem", fontWeight: 700, color: colors.textPrimary, marginBottom: 8, letterSpacing: "-0.012em" }}>
+                  <h3 style={{ fontSize: "1.075rem", fontWeight: 700, color: "#F8FAFC", marginBottom: 8, letterSpacing: "-0.012em" }}>
                     {cap.title}
                   </h3>
-                  <p style={{ fontSize: "0.9rem", color: colors.textSub, lineHeight: 1.72 }}>
+                  <p style={{ fontSize: "0.9rem", color: "rgba(248,250,252,0.55)", lineHeight: 1.72 }}>
                     {cap.desc}
                   </p>
                 </div>
 
                 <button
-                  onClick={() => navigate("/services")}
+                  onClick={() => openServiceModule(navigate, i)}
                   className="relative self-start flex items-center gap-1.5 text-sm font-semibold group-hover:gap-2.5 transition-all duration-200"
-                  style={{ color: "#0055E5" }}
+                  style={{ color: "#38BDF8" }}
                 >
                   Learn more
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -449,28 +449,29 @@ export default function Home() {
       {/* ── TESTIMONIALS ──────────────────────────────────────── */}
       <section
         style={{
-          background: "#071526",
-          borderTop: "1px solid rgba(0,85,229,0.12)",
-          borderBottom: "1px solid rgba(0,85,229,0.12)",
+          background: isDark ? "#071526" : "#FFFFFF",
+          borderTop: `1px solid ${isDark ? "rgba(0,85,229,0.12)" : "rgba(11,29,53,0.08)"}`,
+          borderBottom: `1px solid ${isDark ? "rgba(0,85,229,0.12)" : "rgba(11,29,53,0.08)"}`,
           paddingTop: 96,
           paddingBottom: 96,
         }}
-        className="px-6 lg:px-12"
+        className="px-6 lg:px-12 relative overflow-hidden"
       >
-        <div className="max-w-7xl mx-auto">
+        <div aria-hidden="true" className="rim-glow-r" />
+        <div className="max-w-7xl mx-auto relative">
           <div className="mb-14 reveal flex flex-col sm:flex-row sm:items-end justify-between gap-6">
             <div>
-              <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: "#38BDF8" }}>
+              <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: isDark ? "#38BDF8" : "#0055E5" }}>
                 Client Outcomes
               </p>
-              <h2 style={{ fontSize: "clamp(1.9rem, 3.5vw, 2.5rem)", fontWeight: 700, color: "#F8FAFC", letterSpacing: "-0.022em", lineHeight: 1.15 }}>
+              <h2 style={{ fontSize: "clamp(1.9rem, 3.5vw, 2.5rem)", fontWeight: 700, color: colors.textPrimary, letterSpacing: "-0.022em", lineHeight: 1.15 }}>
                 What our clients say
               </h2>
             </div>
             <button
-              onClick={() => navigate("/contact")}
+              onClick={() => openContactForm(navigate)}
               className="self-start sm:self-auto flex-shrink-0 text-sm font-semibold transition-all hover:opacity-80"
-              style={{ color: "#38BDF8", display: "flex", alignItems: "center", gap: 6 }}
+              style={{ color: isDark ? "#38BDF8" : "#0055E5", display: "flex", alignItems: "center", gap: 6 }}
             >
               Start your engagement
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
@@ -486,10 +487,13 @@ export default function Home() {
                 className="card-hover reveal flex flex-col gap-5"
                 data-reveal-delay={`${i * 70}`}
                 style={{
-                  background: "#0B1D35",
-                  border: "1px solid rgba(56,189,248,0.12)",
+                  background: isDark ? "#0B1D35" : "#FFFFFF",
+                  border: `1px solid ${isDark ? "rgba(56,189,248,0.12)" : "#E2E8F0"}`,
                   borderRadius: 16,
                   padding: "32px",
+                  boxShadow: isDark
+                    ? "0 1px 4px rgba(0,0,0,0.30), 0 4px 20px rgba(0,0,0,0.18)"
+                    : "0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.04)",
                   position: "relative",
                   overflow: "hidden",
                 }}
@@ -499,7 +503,7 @@ export default function Home() {
                   className="absolute top-4 right-5 pointer-events-none"
                   style={{
                     fontSize: "5rem", fontWeight: 800, lineHeight: 1,
-                    color: "rgba(56,189,248,0.07)",
+                    color: isDark ? "rgba(56,189,248,0.07)" : "rgba(0,85,229,0.06)",
                     fontFamily: "Georgia, serif",
                     userSelect: "none",
                   }}
@@ -516,20 +520,20 @@ export default function Home() {
                   ))}
                 </div>
 
-                <p style={{ fontSize: "0.9rem", color: "rgba(248,250,252,0.68)", lineHeight: 1.78, flex: 1 }}>
+                <p style={{ fontSize: "0.9rem", color: isDark ? "rgba(248,250,252,0.68)" : colors.textSub, lineHeight: 1.78, flex: 1 }}>
                   "{t.quote}"
                 </p>
 
-                <div className="flex items-center gap-3 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="flex items-center gap-3 pt-2" style={{ borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : colors.cardBorder}` }}>
                   <img
                     src={t.photo}
                     alt={t.name}
                     loading="lazy"
-                    style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(56,189,248,0.25)", flexShrink: 0 }}
+                    style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", border: `2px solid ${isDark ? "rgba(56,189,248,0.25)" : "rgba(0,85,229,0.25)"}`, flexShrink: 0 }}
                   />
                   <div>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "#F8FAFC" }}>{t.name}</div>
-                    <div style={{ fontSize: "0.75rem", color: "rgba(248,250,252,0.40)" }}>{t.role}, {t.company}</div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 700, color: colors.textPrimary }}>{t.name}</div>
+                    <div style={{ fontSize: "0.75rem", color: colors.textMuted }}>{t.role}, {t.company}</div>
                   </div>
                 </div>
               </div>
@@ -563,7 +567,7 @@ export default function Home() {
             </p>
             <div className="flex flex-wrap gap-3 mt-1">
               <button
-                onClick={() => navigate("/contact")}
+                onClick={() => openContactForm(navigate)}
                 className="text-sm font-semibold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.98]"
                 style={{ background: "#0055E5", borderRadius: 9, padding: "11px 24px", boxShadow: "0 2px 12px rgba(0,85,229,0.30)" }}
               >
@@ -606,9 +610,10 @@ export default function Home() {
           paddingBottom: 96,
           borderTop: "1px solid rgba(0,85,229,0.10)",
         }}
-        className="px-6 lg:px-12"
+        className="px-6 lg:px-12 relative overflow-hidden"
       >
-        <div className="max-w-3xl mx-auto text-center flex flex-col items-center gap-7">
+        <div aria-hidden="true" className="crown-glow crown-glow--soft" />
+        <div className="max-w-3xl mx-auto text-center flex flex-col items-center gap-7 relative">
           <div
             className="reveal"
             style={{
@@ -635,7 +640,7 @@ export default function Home() {
 
           <div className="reveal flex flex-wrap justify-center gap-3" data-reveal-delay="140">
             <button
-              onClick={() => navigate("/contact")}
+              onClick={() => openContactForm(navigate)}
               className="group cta-glow inline-flex items-center gap-2 text-sm font-semibold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.98]"
               style={{
                 background: "#0055E5",
@@ -675,21 +680,25 @@ export default function Home() {
           </p>
 
           {/* Brand signature close */}
-          <div className="reveal flex items-center gap-4" data-reveal-delay="280" style={{ marginTop: 4 }}>
-            <span className="h-px" style={{ flex: 1, maxWidth: 56, background: "rgba(248,250,252,0.08)" }} />
+          <div
+            className="reveal flex flex-wrap items-center justify-center gap-x-4 gap-y-1"
+            data-reveal-delay="280"
+            style={{ marginTop: 4 }}
+          >
+            <span className="hidden sm:block h-px" style={{ flex: "1 1 56px", maxWidth: 56, background: "rgba(248,250,252,0.08)" }} />
             <span
+              className="whitespace-normal text-center sm:whitespace-nowrap sm:text-left"
               style={{
                 fontSize: "0.68rem",
                 fontWeight: 600,
                 letterSpacing: "0.3em",
                 textTransform: "uppercase",
                 color: "rgba(248,250,252,0.32)",
-                whiteSpace: "nowrap",
               }}
             >
               Allverze — Connecting Possibilities
             </span>
-            <span className="h-px" style={{ flex: 1, maxWidth: 56, background: "rgba(248,250,252,0.08)" }} />
+            <span className="hidden sm:block h-px" style={{ flex: "1 1 56px", maxWidth: 56, background: "rgba(248,250,252,0.08)" }} />
           </div>
         </div>
       </section>

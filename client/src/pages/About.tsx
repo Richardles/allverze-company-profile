@@ -1,7 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../theme/ThemeContext";
 import { useThemeColors } from "../theme/useThemeColors";
+import { openContactForm } from "../lib/contactNav";
 import OrbitalRing from "../components/OrbitalRing";
+import logoFull from "../imports/logo-full.png";
 
 const coreValues = [
   {
@@ -116,8 +118,10 @@ export default function About() {
   return (
     <main style={{ paddingTop: 72 }}>
       {/* ── HEADER BANNER ─────────────────────────────────────── */}
-      <section style={{ background: "#0B1D35", paddingTop: 88, paddingBottom: 88 }} className="px-6 lg:px-12">
-        <div className="max-w-7xl mx-auto">
+      <section style={{ background: "#0B1D35", paddingTop: 88, paddingBottom: 88 }} className="px-6 lg:px-12 relative overflow-hidden">
+        <div aria-hidden="true" className="crown-glow" />
+        <div className="absolute inset-0 pointer-events-none dot-grid dot-grid--fade" style={{ opacity: 0.5 }} />
+        <div className="max-w-7xl mx-auto relative">
           <p className="font-bold tracking-[0.14em] uppercase mb-5 fade-in-up" style={{ fontSize: "0.6875rem", color: "#38BDF8" }}>
             About Allverze
           </p>
@@ -148,46 +152,64 @@ export default function About() {
 
       {/* ── ORBITAL RING STORY ────────────────────────────────── */}
       <section style={{ background: colors.pageBg, paddingTop: 96, paddingBottom: 96 }} className="px-6 lg:px-12">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-          <div className="flex justify-center reveal">
-            <div className="orbital-float" style={{ maxWidth: "min(320px, 82vw)", width: "100%" }}>
-              <OrbitalRing size={320} variant="constellation" />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-7">
-            <div className="reveal" data-reveal-delay="70">
-              <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: "#0055E5" }}>
-                The Orbital Ring
-              </p>
-              <h2 style={{ fontSize: "clamp(1.75rem, 3vw, 2.3rem)", fontWeight: 700, color: colors.textPrimary, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
-                A Symbol of the Connected Ecosystem
-              </h2>
-            </div>
-
-            <div className="flex flex-col gap-6">
-              {orbitalStory.map((item, i) => (
-                <div key={item.label} className="flex gap-4 reveal" data-reveal-delay={`${140 + i * 60}`}>
-                  <div
-                    style={{
-                      width: 6, height: 6, borderRadius: "50%",
-                      background: "#0055E5", flexShrink: 0, marginTop: 8,
-                    }}
-                  />
-                  <div>
-                    <div style={{ fontSize: "0.9rem", fontWeight: 700, color: colors.textPrimary, marginBottom: 4 }}>{item.label}</div>
-                    <p style={{ fontSize: "0.875rem", color: colors.textSub, lineHeight: 1.7 }}>{item.desc}</p>
+        <div className="max-w-7xl mx-auto">
+          <div className={`orbital-pod reveal${isDark ? " orbital-pod--dark" : ""}`}>
+            <div aria-hidden="true" className="orbital-pod__glow" />
+            <img
+              src={logoFull}
+              alt=""
+              role="presentation"
+              aria-hidden="true"
+              draggable={false}
+              className="orbital-pod__mark"
+            />
+            <div aria-hidden="true" className="orbital-pod__grid dot-grid--fade-edges" />
+            <div aria-hidden="true" className="grain-iconic" />
+            <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-14 lg:gap-24 items-center">
+              <div className="flex justify-center">
+                <div className="orbital-stage" style={{ maxWidth: "min(400px, 82vw)", width: "100%" }}>
+                  <div className="orbital-float" style={{ width: "100%", position: "relative", zIndex: 1 }}>
+                    <OrbitalRing size={400} variant="constellation" />
                   </div>
                 </div>
-              ))}
+              </div>
+
+              <div className="flex flex-col gap-7">
+                <div className="reveal" data-reveal-delay="70">
+                  <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: "#38BDF8" }}>
+                    The Orbital Ring
+                  </p>
+                  <h2 style={{ fontSize: "clamp(1.75rem, 3vw, 2.3rem)", fontWeight: 700, color: "#F8FAFC", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+                    A Symbol of the Connected Ecosystem
+                  </h2>
+                </div>
+
+                <div className="flex flex-col gap-6">
+                  {orbitalStory.map((item, i) => (
+                    <div key={item.label} className="flex gap-4 reveal" data-reveal-delay={`${140 + i * 60}`}>
+                      <div
+                        style={{
+                          width: 6, height: 6, borderRadius: "50%",
+                          background: "#38BDF8", flexShrink: 0, marginTop: 8,
+                        }}
+                      />
+                      <div>
+                        <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "#F8FAFC", marginBottom: 4 }}>{item.label}</div>
+                        <p style={{ fontSize: "0.875rem", color: "rgba(248,250,252,0.58)", lineHeight: 1.7 }}>{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* ── MISSION & VISION ──────────────────────────────────── */}
-      <section style={{ background: "#0B1D35", paddingTop: 96, paddingBottom: 96 }} className="px-6 lg:px-12">
-        <div className="max-w-7xl mx-auto">
+      <section style={{ background: "#0B1D35", paddingTop: 96, paddingBottom: 96 }} className="px-6 lg:px-12 relative overflow-hidden">
+        <div aria-hidden="true" className="rim-glow-r" />
+        <div className="max-w-7xl mx-auto relative">
           <div className="mb-14 reveal">
             <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: "#38BDF8" }}>
               Purpose & Direction
@@ -301,8 +323,9 @@ export default function About() {
       </section>
 
       {/* ── CORE VALUES ───────────────────────────────────────── */}
-      <section style={{ background: "#0B1D35", paddingTop: 96, paddingBottom: 96 }} className="px-6 lg:px-12">
-        <div className="max-w-7xl mx-auto">
+      <section style={{ background: "#0B1D35", paddingTop: 96, paddingBottom: 96 }} className="px-6 lg:px-12 relative overflow-hidden">
+        <div aria-hidden="true" className="rim-glow-r" />
+        <div className="max-w-7xl mx-auto relative">
           <div className="mb-14 reveal">
             <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: "#38BDF8" }}>
               What We Stand For
@@ -443,7 +466,7 @@ export default function About() {
             Ready to work with a team that solves, not just sells?
           </h2>
           <button
-            onClick={() => navigate("/contact")}
+            onClick={() => openContactForm(navigate)}
             className="flex-shrink-0 text-sm font-semibold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.98]"
             style={{ background: "#0055E5", borderRadius: 9, padding: "12px 28px", boxShadow: "0 2px 12px rgba(0,85,229,0.28)", whiteSpace: "nowrap" }}
           >

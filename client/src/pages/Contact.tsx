@@ -4,6 +4,7 @@ import { inputFocusHandlers, useThemeColors } from "../theme/useThemeColors";
 import { useContactForm } from "../contact/ContactFormContext";
 import { CONTACT_INTENTS } from "../data/contact";
 import { WHATSAPP_URL, PUBLIC_EMAIL } from "../config";
+import { CONTACT_FORM_ID } from "../lib/contactNav";
 import ShieldIcon from "../components/ShieldIcon";
 
 const faqs = [
@@ -58,7 +59,8 @@ export default function Contact() {
         style={{ background: "#0B1D35", paddingTop: 88, paddingBottom: 88, position: "relative", overflow: "hidden" }}
         className="px-6 lg:px-12"
       >
-        <div className="absolute inset-0 pointer-events-none dot-grid" style={{ opacity: 0.3 }} />
+        <div aria-hidden="true" className="crown-glow" />
+        <div className="absolute inset-0 pointer-events-none dot-grid dot-grid--fade" style={{ opacity: 0.5 }} />
         <div
           className="absolute inset-0 pointer-events-none"
           style={{ background: "linear-gradient(160deg, rgba(0,85,229,0.08) 0%, transparent 60%)" }}
@@ -179,7 +181,7 @@ export default function Contact() {
             </div>
 
             {/* Social links */}
-            <div className="reveal flex gap-3" data-reveal-delay="140">
+            <div className="reveal flex flex-wrap gap-3" data-reveal-delay="140">
               {[
                 {
                   label: "LinkedIn",
@@ -202,7 +204,7 @@ export default function Contact() {
                   href={s.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm font-semibold card-hover flex-1 justify-center"
+                  className="flex items-center gap-2 text-sm font-semibold card-hover grow basis-[130px] justify-center"
                   style={{
                     background: cardBg,
                     border: `1px solid ${cardBorder}`,
@@ -244,8 +246,10 @@ export default function Contact() {
 
           {/* Right: Form */}
           <div
+            id={CONTACT_FORM_ID}
             className="lg:col-span-3"
             style={{
+              position: "relative",
               background: cardBg,
               border: `1px solid ${cardBorder}`,
               borderRadius: 18,
@@ -286,7 +290,7 @@ export default function Contact() {
                       flexDirection: "column",
                       alignItems: "center",
                       gap: 4,
-                      minWidth: 240,
+                      minWidth: "min(240px, 100%)",
                       animationDelay: "80ms",
                     }}
                   >
@@ -381,7 +385,7 @@ export default function Contact() {
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label htmlFor="contact-email" style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: textMuted }}>Work Email *</label>
+                    <label htmlFor="contact-email" style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: textMuted }}>Email *</label>
                     <input
                       id="contact-email"
                       type="email" required placeholder="jane@company.com"

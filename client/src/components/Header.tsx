@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useTheme } from "../theme/ThemeContext";
+import { openContactForm } from "../lib/contactNav";
 import allverzeLogo from "../imports/logo.webp";
 
 const navLinks = [
@@ -97,8 +98,8 @@ export default function Header() {
             onClick={toggle}
             className="flex items-center justify-center transition-all duration-200 hover:opacity-80"
             style={{
-              width: 38,
-              height: 38,
+              width: 44,
+              height: 44,
               borderRadius: "50%",
               background: isDark ? "rgba(56,189,248,0.06)" : "rgba(0,85,229,0.04)",
               border: isDark ? "1px solid rgba(56,189,248,0.14)" : "1px solid rgba(0,85,229,0.10)",
@@ -108,14 +109,14 @@ export default function Header() {
           >
             {isDark ? (
               <span key="light" className="animate-theme-pop" style={{ display: "flex" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="5" />
                   <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
                 </svg>
               </span>
             ) : (
               <span key="dark" className="animate-theme-pop" style={{ display: "flex" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                 </svg>
               </span>
@@ -123,7 +124,7 @@ export default function Header() {
           </button>
 
           <button
-            onClick={() => navigate("/contact")}
+            onClick={() => openContactForm(navigate)}
             className="inline-flex items-center gap-2 text-sm font-semibold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.98]"
             style={{
               background: "#0055E5",
@@ -139,7 +140,7 @@ export default function Header() {
         {/* Mobile controls */}
         <div className="md:hidden flex items-center gap-2">
           <button
-            onClick={() => { navigate("/contact"); setMenuOpen(false); }}
+            onClick={() => { openContactForm(navigate); setMenuOpen(false); }}
             className="inline-flex items-center gap-2 text-sm font-semibold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.98]"
             style={{
               background: "#0055E5",
@@ -179,32 +180,40 @@ export default function Header() {
           }}
         >
           <button
+            role="switch"
+            aria-checked={isDark}
             onClick={toggle}
-            className="menu-link self-end flex items-center justify-center transition-all duration-200 hover:opacity-80"
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: "50%",
-              background: isDark ? "rgba(56,189,248,0.06)" : "rgba(0,85,229,0.04)",
-              border: isDark ? "1px solid rgba(56,189,248,0.14)" : "1px solid rgba(0,85,229,0.10)",
-              color: isDark ? "#38BDF8" : "#0055E5",
-            }}
-            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            className="menu-link touch-manipulation flex items-center justify-between w-full px-3 py-2.5 text-sm font-semibold transition-colors"
+            style={{ color: navColor, borderRadius: 6, WebkitTapHighlightColor: "transparent" }}
           >
-            {isDark ? (
-              <span key="light" className="animate-theme-pop" style={{ display: "flex" }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <circle cx="12" cy="12" r="5" />
-                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-                </svg>
-              </span>
-            ) : (
-              <span key="dark" className="animate-theme-pop" style={{ display: "flex" }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                </svg>
-              </span>
-            )}
+            <span className="flex items-center gap-2.5">
+              {isDark ? (
+                <span key="dark" className="animate-theme-pop" style={{ display: "flex", color: "#38BDF8" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                  </svg>
+                </span>
+              ) : (
+                <span key="light" className="animate-theme-pop" style={{ display: "flex", color: "#0055E5" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="5" />
+                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                  </svg>
+                </span>
+              )}
+              Dark mode
+            </span>
+            <span
+              className="theme-switch"
+              data-on={isDark ? "true" : "false"}
+              style={{
+                background: isDark ? "#0055E5" : "transparent",
+                borderColor: isDark ? "#0055E5" : "rgba(0,85,229,0.22)",
+              }}
+              aria-hidden="true"
+            >
+              <span className="theme-switch-thumb" style={{ background: isDark ? "#F8FAFC" : "#0055E5" }} />
+            </span>
           </button>
           {navLinks.map(({ label, path }, i) => (
             <NavLink
@@ -229,6 +238,9 @@ export default function Header() {
           ))}
         </div>
       )}
+      <span className="sr-only" role="status" aria-live="polite">
+        {isDark ? "Dark mode" : "Light mode"}
+      </span>
     </header>
   );
 }

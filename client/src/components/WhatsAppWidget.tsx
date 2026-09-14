@@ -7,7 +7,11 @@ export default function WhatsAppWidget() {
   return (
     <div
       className="fixed bottom-8 right-8 z-50 flex items-center gap-3"
-      style={{ filter: "drop-shadow(0 8px 32px rgba(0,0,0,0.28))" }}
+      style={{
+        bottom: "max(2rem, env(safe-area-inset-bottom, 0px))",
+        right: "max(2rem, env(safe-area-inset-right, 0px))",
+        filter: "drop-shadow(0 8px 32px rgba(0,0,0,0.28))",
+      }}
     >
       <div
         className="flex flex-col items-end transition-all duration-300 origin-right"
@@ -23,6 +27,9 @@ export default function WhatsAppWidget() {
             background: "rgba(15,30,54,0.92)",
             backdropFilter: "blur(12px)",
             border: "1px solid rgba(56,189,248,0.2)",
+            maxWidth: "min(260px, calc(100vw - 104px))",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
         >
           Chat with Solutions Engineer

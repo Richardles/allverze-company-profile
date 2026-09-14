@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../theme/ThemeContext";
 import { useThemeColors } from "../theme/useThemeColors";
+import { openContactForm, openServiceModule } from "../lib/contactNav";
 import { WHATSAPP_URL } from "../config";
 import ShieldIcon from "../components/ShieldIcon";
 
@@ -76,8 +77,10 @@ export default function Services() {
   return (
     <main style={{ paddingTop: 72 }}>
       {/* ── HEADER BANNER ─────────────────────────────────────── */}
-      <section style={{ background: "#0B1D35", paddingTop: 88, paddingBottom: 88 }} className="px-6 lg:px-12">
-        <div className="max-w-7xl mx-auto">
+      <section style={{ background: "#0B1D35", paddingTop: 88, paddingBottom: 88 }} className="px-6 lg:px-12 relative overflow-hidden">
+        <div aria-hidden="true" className="crown-glow" />
+        <div className="absolute inset-0 pointer-events-none dot-grid dot-grid--fade" style={{ opacity: 0.5 }} />
+        <div className="max-w-7xl mx-auto relative">
           <p className="font-bold tracking-[0.14em] uppercase mb-5 fade-in-up" style={{ fontSize: "0.6875rem", color: "#38BDF8" }}>
             Enterprise Solutions
           </p>
@@ -104,9 +107,7 @@ export default function Services() {
               <button
                 key={i}
                 type="button"
-                onClick={() => {
-                  document.getElementById(`module-${i + 1}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
+                onClick={() => openServiceModule(navigate, i)}
                 style={{
                   fontSize: "0.75rem", fontWeight: 600,
                   color: "rgba(248,250,252,0.55)",
@@ -248,7 +249,7 @@ export default function Services() {
                   </ul>
 
                   <button
-                    onClick={() => navigate("/contact")}
+                    onClick={() => openContactForm(navigate)}
                     className="self-start text-sm font-semibold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.98]"
                     style={{ background: "#0055E5", borderRadius: 9, padding: "10px 22px", marginTop: 4, boxShadow: "0 2px 10px rgba(0,85,229,0.22)" }}
                   >
@@ -341,7 +342,7 @@ export default function Services() {
           </div>
           <div className="reveal flex flex-col sm:flex-row gap-3 flex-shrink-0" data-reveal-delay="80">
             <button
-              onClick={() => navigate("/contact")}
+              onClick={() => openContactForm(navigate)}
               className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-white transition-all duration-150 hover:opacity-90"
               style={{ background: "#0055E5", borderRadius: 9, padding: "12px 24px", boxShadow: "0 2px 12px rgba(0,85,229,0.30)", whiteSpace: "nowrap" }}
             >
