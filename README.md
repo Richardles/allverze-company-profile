@@ -38,10 +38,35 @@ npm-workspaces monorepo with two packages:
 
 ## Run
 
+**Option A — one window (both processes):**
 - `npm run dev` — concurrently starts Vite (`:5173`) and the email API (`:3001`); Vite dev-proxies `/api → localhost:3001`.
+
+**Option B — separate windows (own logs):**
+- Window 1: `npm run dev:client` — Vite `:5173`
+- Window 2: `npm run dev:server` — email API `:3001`
+
+(The Vite dev-proxy still forwards `/api → localhost:3001`.)
+
+Other commands:
 - `npm run build` — `tsc -b && vite build` inside `client/` → `client/dist/` (must pass before deploy).
 - `npm run lint` — ESLint for both `client` and `server` (must be 0 errors).
 - `npm run server` / `npm start` — run the email API only.
+
+## Local preview via Cloudflare Tunnel
+
+1. **Window 1 — client**: `npm run dev:client` (Vite `:5173`)
+2. **Window 2 — server**: `npm run dev:server` (email API `:3001`)
+   - (or a single window with `npm run dev` if you prefer one log)
+3. **Window 3 — expose it** (cloudflared at `C:\Program Files (x86)\cloudflared\cloudflared.exe`):
+   ```
+   cloudflared tunnel --url http://localhost:5173 run preview
+   ```
+   → live at `https://preview.allverze.com/`.
+
+Gotchas:
+- `run` takes exactly **one** positional (the tunnel name) — `--url` must come **before** `run`.
+- `code:1003` from `route dns` = the `preview.allverze.com` record already exists — delete it in the Cloudflare dashboard (or hand-edit the CNAME to `92555de8-6212-448c-af64-6b09a91e65d4.cfargotunnel.com`) and retry.
+- Error `1033` (HTTP 530) = hostname routed to a tunnel with no active connector — make sure Window 3 is running.
 
 ## Configuration
 
