@@ -154,6 +154,17 @@ body {
   }
 }
 
+/* ?perf&grainoff debug mode: suppress the full-viewport blend + header blur to
+   measure their frame-time contribution on a real phone (HUD gated, inert by default). */
+[data-perf-grain="0"] .grain,
+[data-perf-grain="0"] .grain-iconic {
+  opacity: 0 !important;
+}
+[data-perf-grain="0"] header {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
 /* T3 · ambient key-light glows */
 .crown-glow {
   position: absolute;
@@ -254,6 +265,9 @@ body {
 }
 .orbital-stage {
   position: relative;
+  /* Contain the ring's SVG churn: repaints/layout can't propagate to ancestors or
+     outside the stage (Chromium benefit; WebKit neutral). Zero visual change. */
+  contain: layout style paint;
 }
 
 /* ── Card glow on hover ──────────────────────────────────── */

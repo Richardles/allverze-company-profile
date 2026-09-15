@@ -55,6 +55,8 @@ interface Star extends Orbit {
   glowR: number;
   base: number;
   hueIdx: number;
+  /* Precomputed angular velocity 2π/P (rad/s) — avoids a per-star division every frame. */
+  w: number;
 }
 
 const VARIANTS: Record<"tube" | "constellation", VariantTuning> = {
@@ -218,6 +220,7 @@ const LINE_REST_W = 1.25; // crisp constellation edge resting width (snap pops t
 const ECHO_OP = 0.6; // echo dot peak opacity
 const ECHO_DECAY = 0.88; // per-frame decay of the echo burst
 const ECHO_RADII = [0.045, 0.07, 0.095]; // echo flight radii as fraction of size
+const ECHO_DIR = [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3]; // 3 dots at 120° spacing
 
 interface CometGeo {
   head: [number, number];
@@ -264,6 +267,108 @@ const BETA_LADDER = [0.004, 0.03, 0.09, 0.18, 0.34, 0.55];
 const BLOWOUT_BETA = 0.85;
 const EJECT_JITTER = 0.014; // ε ejection-velocity spread as fraction of size (Combi & Smyth)
 
+/* β-only grain period-lag factor 1 − (1−β)^1.5, hoisted out of the per-epoch solve
+   loop (it is recomputed 18× per lane per substep otherwise). */
+const LAG_BY_BETA = BETA_LADDER.map((beta) => 1 - Math.pow(1 - beta, 1.5));
+const BLOWOUT_LAG = 1 - Math.pow(1 - BLOWOUT_BETA, 1.5);
+
+/* Adaptive ε-gated writes (zero-visual): geometry is always solved at full rate,
+   but DOM writes are skipped until an element has perceptibly moved. Sub-ε motion
+   is invisible — stars drift ~0.5px/frame at majestic (writes land ~30Hz instead
+   of 60Hz), and the comet tail steps ≪ its halo-blur σ (≈5.7px at size 480). The
+   biggest win is WebKit (iPhone), which ignores SVG will-change: far fewer
+   main-thread re-rasters per second. */
+const STAR_EPS = 0.8; // px — star re-write threshold (≈2× the ~0.5px/frame drift)
+const STAR_EPS_SQ = STAR_EPS * STAR_EPS;
+const COMET_TAIL_EPS = 1.5; // px — ~¼ of the halo-blur σ: steps wash out in the blur
+const COMET_TAIL_EPS_SQ = COMET_TAIL_EPS * COMET_TAIL_EPS;
+const COMET_TAIL_SAMPLES = 9; // [x,y] pairs cached for the tail's adaptive write gate
+const COMET_HEAD_EPS = 0.4; // px — comet-head translate/opacity write threshold (blurred glow; sub-device-px at DPR3)
+const COMET_HEAD_EPS_SQ = COMET_HEAD_EPS * COMET_HEAD_EPS;
+const COMET_MOTE_EPS = 0.35; // px — per-mote transform write threshold (tiny crisp dots; near-invisible step)
+const COMET_MOTE_EPS_SQ = COMET_MOTE_EPS * COMET_MOTE_EPS;
+
+// Sampled free points of the comet tail — if every one is within ε of the last
+// written frame, all filtered tail writes are skipped this substep (the tail only
+// re-renders once it has really moved). Cache layout (x,y pairs): head, lane0
+// near, lane2 far, lane5 near, lane5 far, blowout mid, blowout far, ionEnd, sodiumEnd.
+function tailMoved(geo: CometGeo, last: Float64Array): boolean {
+  const e2 = COMET_TAIL_EPS_SQ;
+  let moved = false;
+  const bump = (i: number, x: number, y: number) => {
+    const dx = x - last[i];
+    const dy = y - last[i + 1];
+    if (dx * dx + dy * dy >= e2) moved = true;
+  };
+  bump(0, geo.head[0], geo.head[1]);
+  bump(2, geo.lanes[0][0][0], geo.lanes[0][0][1]);
+  const l2 = geo.lanes[2];
+  const l2f = l2[l2.length - 1];
+  bump(4, l2f[0], l2f[1]);
+  const l5 = geo.lanes[5];
+  const l5f = l5[l5.length - 1];
+  bump(6, l5[0][0], l5[0][1]);
+  bump(8, l5f[0], l5f[1]);
+  const bm = geo.blowout[geo.blowout.length >> 1];
+  const bf = geo.blowout[geo.blowout.length - 1];
+  bump(10, bm[0], bm[1]);
+  bump(12, bf[0], bf[1]);
+  bump(14, geo.ionEnd[0], geo.ionEnd[1]);
+  bump(16, geo.sodiumEnd[0], geo.sodiumEnd[1]);
+  return moved;
+}
+
+function tailSave(geo: CometGeo, last: Float64Array): void {
+  last[0] = geo.head[0];
+  last[1] = geo.head[1];
+  last[2] = geo.lanes[0][0][0];
+  last[3] = geo.lanes[0][0][1];
+  const l2 = geo.lanes[2];
+  const l2f = l2[l2.length - 1];
+  last[4] = l2f[0];
+  last[5] = l2f[1];
+  const l5 = geo.lanes[5];
+  const l5f = l5[l5.length - 1];
+  last[6] = l5[0][0];
+  last[7] = l5[0][1];
+  last[8] = l5f[0];
+  last[9] = l5f[1];
+  const bm = geo.blowout[geo.blowout.length >> 1];
+  const bf = geo.blowout[geo.blowout.length - 1];
+  last[10] = bm[0];
+  last[11] = bm[1];
+  last[12] = bf[0];
+  last[13] = bf[1];
+  last[14] = geo.ionEnd[0];
+  last[15] = geo.ionEnd[1];
+  last[16] = geo.sodiumEnd[0];
+  last[17] = geo.sodiumEnd[1];
+}
+
+/* Pre-allocated comet geometry: cometGeometry writes into these fixed buffers and
+   returns the shared COMET_GEO result — zero allocation per dust sub-step (~340
+   tuple/array allocs saved). Safe because only one OrbitalRing mounts at a time
+   (distinct SPA routes) and the caller always consumes the result synchronously. */
+const COMET_MOTES_K = [2, 5, 8, 11, 14];
+const COMET_EMIT_BUF: [number, number][] = Array.from({ length: EPOCHS }, () => [0, 0]);
+const COMET_LANE_BUF: [number, number][][] = Array.from({ length: BETA_LADDER.length }, () =>
+  Array.from({ length: EPOCHS }, () => [0, 0]),
+);
+const COMET_BLOWOUT_BUF: [number, number][] = Array.from({ length: 12 }, () => [0, 0]);
+const COMET_HEAD_BUF: [number, number] = [0, 0];
+const COMET_ION_END_BUF: [number, number] = [0, 0];
+const COMET_SODIUM_END_BUF: [number, number] = [0, 0];
+const COMET_MOTES_BUF: [number, number][] = Array.from({ length: COMET_MOTES_K.length }, () => [0, 0]);
+const COMET_GEO: CometGeo = {
+  head: COMET_HEAD_BUF,
+  lanes: COMET_LANE_BUF,
+  blowout: COMET_BLOWOUT_BUF,
+  ionEnd: COMET_ION_END_BUF,
+  sodiumEnd: COMET_SODIUM_END_BUF,
+  motes: COMET_MOTES_BUF,
+  rRatio: 0,
+};
+
 /* Dust shines by reflected sunlight → yellow-white, reddening with age/processing:
    fresh low-β lanes hang near-white at the orbit; old high-β lanes read amber at the
    anti-solar tip. µm-grain scattering dominates the visible tail → mid-ladder lanes
@@ -286,6 +391,49 @@ function setAttr(el: Element | null, name: string, value: string): void {
   if (m.get(name) === value) return;
   m.set(name, value);
   el.setAttribute(name, value);
+}
+
+/* The glow lines carry the -haloblur CPU filter; a geometry OR opacity change
+   re-rasterises the whole filter region (Chromium image-filters, main thread).
+   The filtered line therefore keeps a STATIC opacity ("1", set once in JSX) and
+   the OTHER 0.055·a·pBoost·(breath) product rides the unwrapped <g> wrapper
+   (compositor-promoted — opacity there never re-filters), so after geometry
+   latches at roll the filter rasterizes exactly once and all envelope motion
+   (draw ramp, completion pulse, edge-snap bloom, 3s breath) is compositor-only.
+   Endpoint rewrites are thresholded to ≫ sub-halo-σ drift, so a settled figure
+   re-filters roughly once per roll instead of every paint. */
+const GLOW_COORD_EPS = 1.5;
+function paintGlowLine(
+  glow: SVGLineElement | null,
+  wrap: SVGGElement | null,
+  last: Float64Array,
+  k: number,
+  p0: [number, number] | null,
+  p1: [number, number] | null,
+  lineOp: number,
+  breath: number,
+): void {
+  const base = k * 4;
+  if (p0 && p1) {
+    if (
+      last[base] === -1e9 ||
+      Math.abs(p0[0] - last[base]) +
+        Math.abs(p0[1] - last[base + 1]) +
+        Math.abs(p1[0] - last[base + 2]) +
+        Math.abs(p1[1] - last[base + 3]) >=
+        GLOW_COORD_EPS
+    ) {
+      setAttr(glow, "x1", p0[0].toFixed(2));
+      setAttr(glow, "y1", p0[1].toFixed(2));
+      setAttr(glow, "x2", p1[0].toFixed(2));
+      setAttr(glow, "y2", p1[1].toFixed(2));
+      last[base] = p0[0];
+      last[base + 1] = p0[1];
+      last[base + 2] = p1[0];
+      last[base + 3] = p1[1];
+    }
+  }
+  if (wrap) wrap.style.opacity = (lineOp * breath).toFixed(3);
 }
 
 /* Newton iterates on the eccentric anomaly; seeded from the previous frame's
@@ -346,6 +494,31 @@ function orbitScreenPos(
   ];
 }
 
+/* Zero-allocation variant: writes into a caller-supplied [x,y] buffer
+   instead of returning a new tuple — eliminates ~27 tuple allocs/frame. */
+function orbitScreenPosInto(
+  o: Pick<Orbit, "a" | "e" | "omega" | "theta" | "p">,
+  M: number,
+  cx: number,
+  cy: number,
+  out: [number, number],
+): void {
+  const seed = keplerSeedCache.get(o as object);
+  const E = keplerSolve(M, o.e, seed);
+  keplerSeedCache.set(o as object, E);
+  const r = o.a * (1 - o.e * Math.cos(E));
+  const nu = 2 * Math.atan2(
+    Math.sqrt(1 + o.e) * Math.sin(E / 2),
+    Math.sqrt(1 - o.e) * Math.cos(E / 2),
+  );
+  const w = nu + o.omega;
+  const u = r * Math.cos(w);
+  const v = r * Math.sin(w);
+  const th = o.theta;
+  out[0] = cx + u * Math.cos(th) - v * Math.sin(th);
+  out[1] = cy + (u * Math.sin(th) + v * Math.cos(th)) * o.p;
+}
+
 /* True comet model (Finson–Probstein): grains are emitted at the nucleus with each
    grain on its OWN orbit — radiation pressure enlarges the effective semi-major axis
    (a/(1−β)) and since P ∝ a^1.5 the grain advances slower, so it lags the head and the
@@ -360,41 +533,50 @@ function cometGeometry(
   size: number,
   kinkPhase = 0,
 ): CometGeo {
-  const head: [number, number] = orbitScreenPos(o, M, cx, cy);
+  const head = COMET_HEAD_BUF;
+  orbitScreenPosInto(o, M, cx, cy, head);
+  const hx = head[0];
+  const hy = head[1];
 
   const grainOrbits = grainOrbitsFor(o);
 
   // Emission point (nucleus at epoch k) is independent of β — solve once per k.
-  const emitByK: [number, number][] = new Array(EPOCHS);
   for (let k = 0; k < EPOCHS; k++) {
-    emitByK[k] = orbitScreenPos(o, M - k * EPOCH_LAG, cx, cy);
+    orbitScreenPosInto(o, M - k * EPOCH_LAG, cx, cy, COMET_EMIT_BUF[k]);
   }
 
-  const grainPoint = (bi: number, beta: number, k: number): [number, number] => {
-    const dM = k * EPOCH_LAG;
-    const Mg = M - dM * (1 - Math.pow(1 - beta, 1.5));
-    const g = orbitScreenPos(grainOrbits[bi], Mg, cx, cy);
-    const emit = emitByK[k];
-    return [head[0] + (g[0] - emit[0]), head[1] + (g[1] - emit[1])];
-  };
-
-  const lanes: [number, number][][] = BETA_LADDER.map((beta, lane) => {
-    const pts: [number, number][] = [];
+  for (let lane = 0; lane < BETA_LADDER.length; lane++) {
+    const beta = BETA_LADDER[lane];
+    const lanePts = COMET_LANE_BUF[lane];
     for (let k = 0; k < EPOCHS; k++) {
-      const [x, y] = grainPoint(lane, beta, k);
-      const jx = Math.sin(k * 12.9898 + lane * 78.233) * EJECT_JITTER * size * Math.max(beta, 0.03);
-      const jy = Math.cos(k * 39.7101 + lane * 27.439) * EJECT_JITTER * size * Math.max(beta, 0.03);
-      pts.push([x + jx, y + jy]);
+      const dM = k * EPOCH_LAG;
+      const Mg = M - dM * LAG_BY_BETA[lane];
+      const p = lanePts[k];
+      orbitScreenPosInto(grainOrbits[lane], Mg, cx, cy, p);
+      const emit = COMET_EMIT_BUF[k];
+      p[0] =
+        hx +
+        p[0] -
+        emit[0] +
+        Math.sin(k * 12.9898 + lane * 78.233) * EJECT_JITTER * size * Math.max(beta, 0.03);
+      p[1] =
+        hy +
+        p[1] -
+        emit[1] +
+        Math.cos(k * 39.7101 + lane * 27.439) * EJECT_JITTER * size * Math.max(beta, 0.03);
     }
-    return pts;
-  });
-
-  const blowout: [number, number][] = [];
-  for (let k = 0; k < 12; k++) {
-    blowout.push(grainPoint(BETA_LADDER.length, BLOWOUT_BETA, k));
   }
 
-  const [hx, hy] = head;
+  for (let k = 0; k < 12; k++) {
+    const dM = k * EPOCH_LAG;
+    const Mg = M - dM * BLOWOUT_LAG;
+    const p = COMET_BLOWOUT_BUF[k];
+    orbitScreenPosInto(grainOrbits[BETA_LADDER.length], Mg, cx, cy, p);
+    const emit = COMET_EMIT_BUF[k];
+    p[0] = hx + p[0] - emit[0];
+    p[1] = hy + p[1] - emit[1];
+  }
+
   const aDx = cx - hx;
   const aDy = cy - hy;
   const aDl = Math.hypot(aDx, aDy) || 1;
@@ -403,31 +585,30 @@ function cometGeometry(
   const sinB = Math.sin(bend);
   const dx = (aDx * cosB - aDy * sinB) / aDl;
   const dy = (aDx * sinB + aDy * cosB) / aDl;
-  const ionEnd: [number, number] = [hx + dx * ION_RATIO * size, hy + dy * ION_RATIO * size];
+  COMET_ION_END_BUF[0] = hx + dx * ION_RATIO * size;
+  COMET_ION_END_BUF[1] = hy + dy * ION_RATIO * size;
 
   const bendNa = ION_ABERRATION + ION_KINK * SODIUM_KINK * Math.sin(kinkPhase);
   const cosNb = Math.cos(bendNa);
   const sinNb = Math.sin(bendNa);
   const naDx = (aDx * cosNb - aDy * sinNb) / aDl;
   const naDy = (aDx * sinNb + aDy * cosNb) / aDl;
-  const sodiumEnd: [number, number] = [
-    hx + naDx * ION_RATIO * SODIUM_RATIO * size,
-    hy + naDy * ION_RATIO * SODIUM_RATIO * size,
-  ];
+  COMET_SODIUM_END_BUF[0] = hx + naDx * ION_RATIO * SODIUM_RATIO * size;
+  COMET_SODIUM_END_BUF[1] = hy + naDy * ION_RATIO * SODIUM_RATIO * size;
 
-  const motes: [number, number][] = [2, 5, 8, 11, 14].map((k) => {
-    const [px, py] = lanes[2][k];
-    return [
-      px + Math.sin(k * 12.9898) * 0.02 * size,
-      py + Math.cos(k * 78.233) * 0.02 * size,
-    ];
-  });
+  const laneMid = COMET_LANE_BUF[2];
+  for (let i = 0; i < COMET_MOTES_K.length; i++) {
+    const k = COMET_MOTES_K[i];
+    const src = laneMid[k];
+    COMET_MOTES_BUF[i][0] = src[0] + Math.sin(k * 12.9898) * 0.02 * size;
+    COMET_MOTES_BUF[i][1] = src[1] + Math.cos(k * 78.233) * 0.02 * size;
+  }
 
   const E = keplerSolve(M, o.e);
   const r = Math.max(o.a * (1 - o.e * Math.cos(E)), 0.0001);
-  const rRatio = (o.a / r) * (o.a / r);
+  COMET_GEO.rRatio = (o.a / r) * (o.a / r);
 
-  return { head, lanes, blowout, ionEnd, sodiumEnd, motes, rRatio };
+  return COMET_GEO;
 }
 
 const cometHeadOpacity = (rRatio: number) => Math.min(1, rRatio * 0.92);
@@ -490,6 +671,7 @@ export default function OrbitalRing({
         base = 0.95;
         core = 0.0096 + rand() * 0.0014;
       }
+      const sP = PERIOD_K * Math.pow(orb.aN, 1.5) * scale;
       const s: Star = {
         k: list.length.toString(),
         x: 0,
@@ -504,7 +686,8 @@ export default function OrbitalRing({
         M0: radians(rand() * 360),
         theta: orb.theta,
         p: orb.p,
-        P: PERIOD_K * Math.pow(orb.aN, 1.5) * scale,
+        P: sP,
+        w: (2 * Math.PI) / sP,
       };
       [s.x, s.y] = orbitScreenPos(s, s.M0, cx, cy);
       list.push(s);
@@ -570,6 +753,10 @@ export default function OrbitalRing({
   const comaglowRef = useRef<SVGRadialGradientElement | null>(null);
   const moteRefs = useRef<(SVGGElement | null)[]>([]);
   const pointerRef = useRef<{ x: number; y: number } | null>(null);
+  /* Cached pointer coords for tracer-line x2/y2 skip — the pointer only moves
+     on mousemove, so rewriting x2/y2 every frame is redundant string alloc. */
+  const lastPtrXRef = useRef(-1);
+  const lastPtrYRef = useRef(-1);
   const constellationLineRefs = useRef<(SVGLineElement | null)[]>([]);
   const constellationOutLineRefs = useRef<(SVGLineElement | null)[]>([]);
   const constellationOutRef = useRef<{ edges: Array<[number, number]>; alpha: number; start: number; bornAt: number } | null>(null);
@@ -588,6 +775,8 @@ export default function OrbitalRing({
   const constellationTipRefs = useRef<(SVGLineElement | null)[]>([]);
   const constellationGlowRefs = useRef<(SVGLineElement | null)[]>([]);
   const constellationGlowOutRefs = useRef<(SVGLineElement | null)[]>([]);
+  const constellationGlowWrapRefs = useRef<(SVGGElement | null)[]>([]);
+  const glowLastRef = useRef<Float64Array | null>(null);
   const constellationWashRef = useRef<SVGEllipseElement | null>(null);
   const constellationCoreWashRef = useRef<SVGEllipseElement | null>(null);
   const constellationHollowRef = useRef<SVGEllipseElement | null>(null);
@@ -612,6 +801,16 @@ export default function OrbitalRing({
   const echoDotRefs = useRef<(SVGCircleElement | null)[]>([]);
   const burstRef = useRef(0);
   const lastNearestRef = useRef(-1);
+  /* Pre-allocated position buffer: avoids new Array(27) + 54 tuple allocs/frame. */
+  const posBufRef = useRef<[number, number][]>([]);
+  /* Adaptive write-gate caches: last DOM-written positions so sub-ε motion skips
+     the paint/filter re-raster (stars: 27×2 coords, comet tail: SAMPLES×2). */
+  const starLastRef = useRef<Float64Array | null>(null);
+  const cometTailLastRef = useRef<Float64Array | null>(null);
+  const cometHeadLastRef = useRef<Float64Array | null>(null);
+  const cometMoteLastRef = useRef<Float64Array | null>(null);
+  /* Pre-allocated edge-progress buffer: avoids new Array(8) per paintConstellation call. */
+  const edgeProgRef = useRef<Float64Array | null>(null);
   const dwellRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hovering, setHovering] = useState(false);
 
@@ -622,6 +821,16 @@ export default function OrbitalRing({
       instant = false,
     ) => {
     const c = constellationStateRef.current;
+    // Lazy-allocate the glow coord cache once (fills with -1e9 sentinel to force
+    // the first paint to write all endpoints).
+    let glowLast = glowLastRef.current;
+    if (!glowLast) {
+      glowLast = new Float64Array(MAX_CONSTELLATION_EDGES * 4).fill(-1e9);
+      glowLastRef.current = glowLast;
+    }
+    // Nothing to paint: no figure and no outgoing retract means the element pool
+    // is already fully hidden — skip the otherwise-dead zeroing loops entirely.
+    if (!c && !constellationOutRef.current) return;
     if (c) {
       if (instant) c.alpha = constellationTargetAlphaRef.current;
       else c.alpha += (constellationTargetAlphaRef.current - c.alpha) * 0.1;
@@ -631,7 +840,11 @@ export default function OrbitalRing({
 
     // Pre-pass: per-edge constant-velocity progress (cascade rhythm via cascadeLag —
     // a 30% accelerating taper so later strokes fall in faster once the sweep is warm).
-    const edgeProg: number[] = [];
+    let edgeProg = edgeProgRef.current;
+    if (!edgeProg || edgeProg.length < MAX_CONSTELLATION_EDGES) {
+      edgeProg = new Float64Array(MAX_CONSTELLATION_EDGES);
+      edgeProgRef.current = edgeProg;
+    }
     let maxProg = 0;
     if (c) {
       for (let k = 0; k < MAX_CONSTELLATION_EDGES; k++) {
@@ -694,15 +907,15 @@ export default function OrbitalRing({
         const p1 = pos[e[1]];
         let len = 0;
         if (p0 && p1) {
-          el.setAttribute("x1", p0[0].toFixed(2));
-          el.setAttribute("y1", p0[1].toFixed(2));
-          el.setAttribute("x2", p1[0].toFixed(2));
-          el.setAttribute("y2", p1[1].toFixed(2));
+          setAttr(el, "x1", p0[0].toFixed(2));
+          setAttr(el, "y1", p0[1].toFixed(2));
+          setAttr(el, "x2", p1[0].toFixed(2));
+          setAttr(el, "y2", p1[1].toFixed(2));
           if (glowOut) {
-            glowOut.setAttribute("x1", p0[0].toFixed(2));
-            glowOut.setAttribute("y1", p0[1].toFixed(2));
-            glowOut.setAttribute("x2", p1[0].toFixed(2));
-            glowOut.setAttribute("y2", p1[1].toFixed(2));
+            setAttr(glowOut, "x1", p0[0].toFixed(2));
+            setAttr(glowOut, "y1", p0[1].toFixed(2));
+            setAttr(glowOut, "x2", p1[0].toFixed(2));
+            setAttr(glowOut, "y2", p1[1].toFixed(2));
           }
           len = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
         }
@@ -711,22 +924,23 @@ export default function OrbitalRing({
         const prog = Math.min(1, Math.max(0, (t - out.bornAt - cascadeLag(rk, out.edges.length)) / dur));
         const easeProg = easeOutQuart(prog);
         if (retract) {
-          el.setAttribute("stroke-dashoffset", easeProg.toFixed(4));
-          if (glowOut) glowOut.setAttribute("stroke-dashoffset", easeOutQuart(Math.min(1, prog + TIP_LEAD)).toFixed(4));
+          setAttr(el, "stroke-dashoffset", easeProg.toFixed(4));
+          if (glowOut) setAttr(glowOut, "stroke-dashoffset", easeOutQuart(Math.min(1, prog + TIP_LEAD)).toFixed(4));
         } else {
-          el.setAttribute("stroke-dashoffset", "0");
-          if (glowOut) glowOut.setAttribute("stroke-dashoffset", "0");
+          setAttr(el, "stroke-dashoffset", "0");
+          if (glowOut) setAttr(glowOut, "stroke-dashoffset", "0");
         }
-        el.setAttribute("opacity", (oa * 0.85 * pBoostOut).toFixed(3));
-        if (glowOut) glowOut.setAttribute("opacity", (DRAIN_BOOST * oa * pBoostOut).toFixed(3));
+        setAttr(el, "opacity", (oa * 0.85 * pBoostOut).toFixed(3));
+        if (glowOut) setAttr(glowOut, "opacity", (DRAIN_BOOST * oa * pBoostOut).toFixed(3));
       } else {
-        el.setAttribute("opacity", "0");
-        if (glowOut) glowOut.setAttribute("opacity", "0");
+        setAttr(el, "opacity", "0");
+        if (glowOut) setAttr(glowOut, "opacity", "0");
       }
     }
     const tipEls = constellationTipRefs.current;
     const glowEls = constellationGlowRefs.current;
     const igniteT = igniteTargetRef.current;
+    const breath = 1 + NEBULA_BREATH * Math.sin((2 * Math.PI * t) / NEBULA_BREATH_PERIOD);
     for (let k = 0; k < MAX_CONSTELLATION_EDGES; k++) {
       const el = constellationLineRefs.current[k];
       if (!el) continue;
@@ -735,10 +949,10 @@ export default function OrbitalRing({
         const p0 = pos[e[0]];
         const p1 = pos[e[1]];
         if (p0 && p1) {
-          el.setAttribute("x1", p0[0].toFixed(2));
-          el.setAttribute("y1", p0[1].toFixed(2));
-          el.setAttribute("x2", p1[0].toFixed(2));
-          el.setAttribute("y2", p1[1].toFixed(2));
+          setAttr(el, "x1", p0[0].toFixed(2));
+          setAttr(el, "y1", p0[1].toFixed(2));
+          setAttr(el, "x2", p1[0].toFixed(2));
+          setAttr(el, "y2", p1[1].toFixed(2));
         }
         const prog = edgeProg[k];
         if (prog >= 1 && igniteT) {
@@ -757,65 +971,68 @@ export default function OrbitalRing({
         const ePulseGlow = 1 + edgeP * EDGE_PULSE_GLOW_BOOST;
         const tip = tipEls[k];
         const glow = glowEls[k];
+        const wGlow = constellationGlowWrapRefs.current[k];
         if (drawOn) {
           const eDraw = easeOutQuart(prog);
           const snapW = LINE_REST_W * (1 + edgeP * EDGE_WIDTH_PULSE);
-          el.setAttribute("stroke-dashoffset", (1 - eDraw).toFixed(4));
-          if (edgeP > 0.03) el.setAttribute("stroke", "#EAF8FF");
-          else el.setAttribute("stroke", "#9BD4FF");
-          el.setAttribute("stroke-width", snapW.toFixed(3));
-          el.setAttribute("opacity", (a * 0.85 * pBoost * ePulse * Math.min(1, eDraw * 2)).toFixed(3));
+          setAttr(el, "stroke-dashoffset", (1 - eDraw).toFixed(4));
+          setAttr(el, "stroke", edgeP > 0.03 ? "#EAF8FF" : "#9BD4FF");
+          setAttr(el, "stroke-width", snapW.toFixed(3));
+          setAttr(el, "opacity", (a * 0.85 * pBoost * ePulse * Math.min(1, eDraw * 2)).toFixed(3));
           if (tip) {
-            tip.setAttribute("stroke-dashoffset", (1 - Math.min(1, eDraw + TIP_LEAD)).toFixed(4));
-            // Cursor-proximity draw power: riding close to the stroke front brightens the nib.
-            let prox = 0;
-            if (ptr && p0 && p1) {
+            if (p0 && p1) {
+              // Geometry biased to the revealed extent: a plain segment [p0, front]
+              // rather than a dashed full-edge line — identical look (blurred round
+              // cap absorbs the sub-px), but the -haloblur raster region now hugs
+              // the drawn portion instead of the whole edge (B1-alt).
               const leadT = Math.min(1, eDraw + TIP_LEAD);
               const tx = p0[0] + (p1[0] - p0[0]) * leadT;
               const ty = p0[1] + (p1[1] - p0[1]) * leadT;
-              prox = Math.max(0, 1 - Math.hypot(ptr.x - tx, ptr.y - ty) / (TIP_PROX_RADIUS * size));
+              setAttr(tip, "x1", p0[0].toFixed(2));
+              setAttr(tip, "y1", p0[1].toFixed(2));
+              setAttr(tip, "x2", tx.toFixed(2));
+              setAttr(tip, "y2", ty.toFixed(2));
+              // Cursor-proximity draw power: riding close to the stroke front brightens the nib.
+              let prox = 0;
+              if (ptr) {
+                prox = Math.max(0, 1 - Math.hypot(ptr.x - tx, ptr.y - ty) / (TIP_PROX_RADIUS * size));
+              }
+              setAttr(
+                tip,
+                "opacity",
+                (TIP_OP * a * pBoost * ePulseGlow * Math.min(1, eDraw * 2) * (1 + TIP_PROXIMITY * prox)).toFixed(3),
+              );
+            } else {
+              setAttr(tip, "opacity", "0");
             }
-            tip.setAttribute(
-              "opacity",
-              (TIP_OP * a * pBoost * ePulseGlow * Math.min(1, eDraw * 2) * (1 + TIP_PROXIMITY * prox)).toFixed(3),
-            );
           }
-          if (glow && p0 && p1) {
-            glow.setAttribute("x1", p0[0].toFixed(2));
-            glow.setAttribute("y1", p0[1].toFixed(2));
-            glow.setAttribute("x2", p1[0].toFixed(2));
-            glow.setAttribute("y2", p1[1].toFixed(2));
-            const breath = 1 + NEBULA_BREATH * Math.sin((2 * Math.PI * t) / NEBULA_BREATH_PERIOD);
-            glow.setAttribute(
-              "opacity",
-              prog >= 1
-                ? Math.min(0.42, (NEBULA_OP * breath + edgeP * EDGE_GLOW_FLASH) * a * pBoost).toFixed(3)
-                : "0",
-            );
-          }
+          paintGlowLine(
+            glow,
+            wGlow,
+            glowLast,
+            k,
+            p0,
+            p1,
+            prog >= 1 ? Math.min(0.42, (NEBULA_OP + edgeP * EDGE_GLOW_FLASH) * a * pBoost) : 0,
+            breath,
+          );
         } else {
-          el.setAttribute("stroke-dashoffset", "0");
-          el.setAttribute("stroke", "#9BD4FF");
-          el.setAttribute("stroke-width", LINE_REST_W.toFixed(2));
-          el.setAttribute("opacity", (a * 0.85 * pBoost * ePulse).toFixed(3));
+          setAttr(el, "stroke-dashoffset", "0");
+          setAttr(el, "stroke", "#9BD4FF");
+          setAttr(el, "stroke-width", LINE_REST_W.toFixed(2));
+          setAttr(el, "opacity", (a * 0.85 * pBoost * ePulse).toFixed(3));
           if (tip) {
-            tip.setAttribute("stroke-dashoffset", "0");
-            tip.setAttribute("opacity", "0");
+            setAttr(tip, "stroke-dashoffset", "0");
+            setAttr(tip, "opacity", "0");
           }
-          if (glow && p0 && p1) {
-            glow.setAttribute("x1", p0[0].toFixed(2));
-            glow.setAttribute("y1", p0[1].toFixed(2));
-            glow.setAttribute("x2", p1[0].toFixed(2));
-            glow.setAttribute("y2", p1[1].toFixed(2));
-            glow.setAttribute("opacity", (NEBULA_OP * a * pBoost).toFixed(3));
-          }
+          paintGlowLine(glow, wGlow, glowLast, k, p0, p1, NEBULA_OP * a * pBoost, breath);
         }
       } else {
-        el.setAttribute("opacity", "0");
+        setAttr(el, "opacity", "0");
         const tipEl = tipEls[k];
-        if (tipEl) tipEl.setAttribute("opacity", "0");
-        const glowEl = glowEls[k];
-        if (glowEl) glowEl.setAttribute("opacity", "0");
+        if (tipEl) setAttr(tipEl, "opacity", "0");
+        const gw = constellationGlowWrapRefs.current[k];
+        if (gw) gw.style.opacity = "0";
       }
     }
     const lead = leaderRef.current;
@@ -823,15 +1040,15 @@ export default function OrbitalRing({
       if (c && ptr && a > 0.02) {
         const p = pos[c.anchor];
         if (p) {
-          lead.setAttribute("x1", p[0].toFixed(2));
-          lead.setAttribute("y1", p[1].toFixed(2));
-          lead.setAttribute("x2", ptr.x.toFixed(2));
-          lead.setAttribute("y2", ptr.y.toFixed(2));
+          setAttr(lead, "x1", p[0].toFixed(2));
+          setAttr(lead, "y1", p[1].toFixed(2));
+          setAttr(lead, "x2", ptr.x.toFixed(2));
+          setAttr(lead, "y2", ptr.y.toFixed(2));
           const leadVis = (drawOn ? Math.min(1, easeDrawP / 0.5) : 1) * Math.min(1, a * 1.4) * 0.75;
-          lead.setAttribute("opacity", leadVis.toFixed(3));
+          setAttr(lead, "opacity", leadVis.toFixed(3));
         }
       } else {
-        lead.setAttribute("opacity", "0");
+        setAttr(lead, "opacity", "0");
       }
     }
     const lab = constellationLabelRef.current;
@@ -839,15 +1056,15 @@ export default function OrbitalRing({
       if (c && a > 0.02) {
         const p = pos[c.anchor];
         if (p) {
-          lab.setAttribute("x", (p[0] + size * 0.024).toFixed(2));
-          lab.setAttribute("y", (p[1] - size * 0.026).toFixed(2));
+          setAttr(lab, "x", (p[0] + size * 0.024).toFixed(2));
+          setAttr(lab, "y", (p[1] - size * 0.026).toFixed(2));
           const labVis = (drawOn ? Math.min(1, easeDrawP / 0.7) : 1) * a * 0.98;
-          lab.setAttribute("opacity", labVis.toFixed(3));
-          lab.setAttribute("letter-spacing", `${(0.34 - 0.08 * Math.min(1, labVis)).toFixed(3)}em`);
+          setAttr(lab, "opacity", labVis.toFixed(3));
+          setAttr(lab, "letter-spacing", `${(0.34 - 0.08 * Math.min(1, labVis)).toFixed(3)}em`);
         }
       } else {
-        lab.setAttribute("opacity", "0");
-        lab.setAttribute("letter-spacing", "0.34em");
+        setAttr(lab, "opacity", "0");
+        setAttr(lab, "letter-spacing", "0.34em");
       }
     }
 
@@ -1023,89 +1240,155 @@ export default function OrbitalRing({
         const geo = cometGeometry(comet, M, cx, cy, size, (2 * Math.PI * t) / ION_KINK_PERIOD);
         const boost = Math.min(1.35, Math.max(0.6, 0.55 + geo.rRatio * 0.45));
 
-        if (headRef.current) {
-          headRef.current.style.transform = `translate(${geo.head[0].toFixed(2)}px,${geo.head[1].toFixed(2)}px)`;
-          setAttr(headRef.current, "opacity", cometHeadOpacity(geo.rRatio).toFixed(3));
+        // Head write gate: same ε principle as the stars — the head is a blurred
+        // ~0.05·size coma, so sub-ε translate+opacity steps are invisible.
+        let headCache = cometHeadLastRef.current;
+        if (!headCache) {
+          headCache = new Float64Array(2);
+          cometHeadLastRef.current = headCache;
         }
-        const laneEls = laneRefs.current;
-        for (let i = 0; i < laneEls.length; i++) {
-          const el = laneEls[i];
-          if (el) {
-            setAttr(el, "points", geo.lanes[i].map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" "));
-            setAttr(el, "opacity", (LANE_OP[i] * boost).toFixed(3));
+        const hx = geo.head[0];
+        const hy = geo.head[1];
+        const hDx = hx - headCache[0];
+        const hDy = hy - headCache[1];
+        if (hDx * hDx + hDy * hDy >= COMET_HEAD_EPS_SQ) {
+          if (headRef.current) {
+            headRef.current.style.transform = `translate(${hx.toFixed(2)}px,${hy.toFixed(2)}px)`;
+            setAttr(headRef.current, "opacity", cometHeadOpacity(geo.rRatio).toFixed(3));
           }
-        }
-        if (blowoutRef.current) {
-          setAttr(
-            blowoutRef.current,
-            "points",
-            geo.blowout.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" "),
-          );
-        }
-        if (fanPathRef.current) {
-          setAttr(fanPathRef.current, "d", fanPath(geo));
-          setAttr(fanPathRef.current, "opacity", (0.1 * boost).toFixed(3));
-        }
-        if (fanGradRef.current) {
-          const gx = geo.head[0];
-          const gy = geo.head[1];
-          const gL = Math.hypot(cx - gx, cy - gy) || 1;
-          setAttr(fanGradRef.current, "x1", gx.toFixed(2));
-          setAttr(fanGradRef.current, "y1", gy.toFixed(2));
-          setAttr(fanGradRef.current, "x2", (gx + ((cx - gx) / gL) * 0.42 * size).toFixed(2));
-          setAttr(fanGradRef.current, "y2", (gy + ((cy - gy) / gL) * 0.42 * size).toFixed(2));
-          setAttr(fanGradRef.current, "opacity", (0.1 * boost).toFixed(3));
+          headCache[0] = hx;
+          headCache[1] = hy;
         }
 
-        const comag = comaglowRef.current;
-        if (comag) {
-          const hx = geo.head[0];
-          const hy = geo.head[1];
-          const sdl = Math.hypot(cx - hx, cy - hy) || 1;
-          const shx = hx + ((cx - hx) / sdl) * size * 0.02;
-          const shy = hy + ((cy - hy) / sdl) * size * 0.02;
-          setAttr(comag, "cx", hx.toFixed(2));
-          setAttr(comag, "cy", hy.toFixed(2));
-          setAttr(comag, "fx", shx.toFixed(2));
-          setAttr(comag, "fy", shy.toFixed(2));
+        // Adaptive ε-gate for the blurred tail: geometry is solved at full rate
+        // above, but these 12 filtered/gradient tail writes only fire when a
+        // sampled point drifted ≥ COMET_TAIL_EPS since the last render — steps
+        // below the halo-blur σ wash out, so the frame is drawn identically.
+        let tail = cometTailLastRef.current;
+        if (!tail) {
+          tail = new Float64Array(COMET_TAIL_SAMPLES * 2);
+          cometTailLastRef.current = tail;
+        }
+        if (tailMoved(geo, tail)) {
+          const laneEls = laneRefs.current;
+          for (let i = 0; i < laneEls.length; i++) {
+            const el = laneEls[i];
+            if (el) {
+              setAttr(el, "points", geo.lanes[i].map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" "));
+              setAttr(el, "opacity", (LANE_OP[i] * boost).toFixed(3));
+            }
+          }
+          if (blowoutRef.current) {
+            setAttr(
+              blowoutRef.current,
+              "points",
+              geo.blowout.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" "),
+            );
+          }
+          if (fanPathRef.current) {
+            setAttr(fanPathRef.current, "d", fanPath(geo));
+            setAttr(fanPathRef.current, "opacity", (0.1 * boost).toFixed(3));
+          }
+          if (fanGradRef.current) {
+            const gx = geo.head[0];
+            const gy = geo.head[1];
+            const gL = Math.hypot(cx - gx, cy - gy) || 1;
+            setAttr(fanGradRef.current, "x1", gx.toFixed(2));
+            setAttr(fanGradRef.current, "y1", gy.toFixed(2));
+            setAttr(fanGradRef.current, "x2", (gx + ((cx - gx) / gL) * 0.42 * size).toFixed(2));
+            setAttr(fanGradRef.current, "y2", (gy + ((cy - gy) / gL) * 0.42 * size).toFixed(2));
+            setAttr(fanGradRef.current, "opacity", (0.1 * boost).toFixed(3));
+          }
+
+          const comag = comaglowRef.current;
+          if (comag) {
+            const sdl = Math.hypot(cx - hx, cy - hy) || 1;
+            const shx = hx + ((cx - hx) / sdl) * size * 0.02;
+            const shy = hy + ((cy - hy) / sdl) * size * 0.02;
+            setAttr(comag, "cx", hx.toFixed(2));
+            setAttr(comag, "cy", hy.toFixed(2));
+            setAttr(comag, "fx", shx.toFixed(2));
+            setAttr(comag, "fy", shy.toFixed(2));
+          }
+
+          const ion = ionLineRefs.current;
+          if (ion[0]) {
+            setAttr(ion[0], "x1", hx.toFixed(2));
+            setAttr(ion[0], "y1", hy.toFixed(2));
+            setAttr(ion[0], "x2", geo.ionEnd[0].toFixed(2));
+            setAttr(ion[0], "y2", geo.ionEnd[1].toFixed(2));
+          }
+          if (ion[1]) {
+            setAttr(ion[1], "x1", hx.toFixed(2));
+            setAttr(ion[1], "y1", hy.toFixed(2));
+            setAttr(ion[1], "x2", geo.ionEnd[0].toFixed(2));
+            setAttr(ion[1], "y2", geo.ionEnd[1].toFixed(2));
+          }
+          if (sodiumRef.current) {
+            setAttr(sodiumRef.current, "x1", hx.toFixed(2));
+            setAttr(sodiumRef.current, "y1", hy.toFixed(2));
+            setAttr(sodiumRef.current, "x2", geo.sodiumEnd[0].toFixed(2));
+            setAttr(sodiumRef.current, "y2", geo.sodiumEnd[1].toFixed(2));
+          }
+          tailSave(geo, tail);
         }
 
-        const ion = ionLineRefs.current;
-        if (ion[0]) {
-          setAttr(ion[0], "x1", geo.head[0].toFixed(2));
-          setAttr(ion[0], "y1", geo.head[1].toFixed(2));
-          setAttr(ion[0], "x2", geo.ionEnd[0].toFixed(2));
-          setAttr(ion[0], "y2", geo.ionEnd[1].toFixed(2));
+        // Mote write gate: per-mote ε, same principle as head/stars. Tiny crisp
+        // dust dots only re-write once they have drifted ~0.35px.
+        let moteCache = cometMoteLastRef.current;
+        if (!moteCache || moteCache.length !== geo.motes.length * 2) {
+          moteCache = new Float64Array(geo.motes.length * 2);
+          cometMoteLastRef.current = moteCache;
         }
-        if (ion[1]) {
-          setAttr(ion[1], "x1", geo.head[0].toFixed(2));
-          setAttr(ion[1], "y1", geo.head[1].toFixed(2));
-          setAttr(ion[1], "x2", geo.ionEnd[0].toFixed(2));
-          setAttr(ion[1], "y2", geo.ionEnd[1].toFixed(2));
-        }
-        if (sodiumRef.current) {
-          setAttr(sodiumRef.current, "x1", geo.head[0].toFixed(2));
-          setAttr(sodiumRef.current, "y1", geo.head[1].toFixed(2));
-          setAttr(sodiumRef.current, "x2", geo.sodiumEnd[0].toFixed(2));
-          setAttr(sodiumRef.current, "y2", geo.sodiumEnd[1].toFixed(2));
-        }
-
         geo.motes.forEach(([x, y], i) => {
           const g = moteRefs.current[i];
-          if (g) g.style.transform = `translate(${x.toFixed(2)}px,${y.toFixed(2)}px)`;
+          if (!g) return;
+          const mDx = x - moteCache[i * 2];
+          const mDy = y - moteCache[i * 2 + 1];
+          if (mDx * mDx + mDy * mDy >= COMET_MOTE_EPS_SQ) {
+            g.style.transform = `translate(${x.toFixed(2)}px,${y.toFixed(2)}px)`;
+            moteCache[i * 2] = x;
+            moteCache[i * 2 + 1] = y;
+          }
         });
       }
 
       const ptr = pointerRef.current;
-      const loopPos: [number, number][] = new Array(stars.length);
+      // Pre-compute pointer x2/y2 once per frame (avoids 27x .toFixed() on the same value).
+      const ptrMoved = ptr && (ptr.x !== lastPtrXRef.current || ptr.y !== lastPtrYRef.current);
+      const ptrX2 = ptr ? ptr.x.toFixed(2) : "";
+      const ptrY2 = ptr ? ptr.y.toFixed(2) : "";
+      if (ptr) { lastPtrXRef.current = ptr.x; lastPtrYRef.current = ptr.y; }
+      // Pre-allocated position buffer: zero allocs per frame.
+      let loopPos = posBufRef.current;
+      if (loopPos.length !== stars.length) {
+        loopPos = new Array(stars.length);
+        for (let i = 0; i < stars.length; i++) loopPos[i] = [0, 0];
+        posBufRef.current = loopPos;
+      }
+      let starLast = starLastRef.current;
+      if (!starLast || starLast.length !== stars.length * 2) {
+        starLast = new Float64Array(stars.length * 2);
+        starLast.fill(-1e9); // sentinel forces the first frame to write every star
+        starLastRef.current = starLast;
+      }
       for (let i = 0; i < stars.length; i++) {
         const s = stars[i];
-        const t2 = s.M0 + (2 * Math.PI * t) / s.P;
-        const [x, y] = orbitScreenPos(s, t2, cx, cy);
-        loopPos[i] = [x, y];
+        const t2 = s.M0 + s.w * t;
+        orbitScreenPosInto(s, t2, cx, cy, loopPos[i]);
+        const x = loopPos[i][0];
+        const y = loopPos[i][1];
         const g = starRefs.current[i];
         if (g) {
-          g.style.transform = `translate(${x.toFixed(2)}px,${y.toFixed(2)}px)`;
+          const lx = starLast[i * 2];
+          const ly = starLast[i * 2 + 1];
+          const dx = x - lx;
+          const dy = y - ly;
+          if (dx * dx + dy * dy >= STAR_EPS_SQ) {
+            g.style.transform = `translate(${x.toFixed(2)}px,${y.toFixed(2)}px)`;
+            starLast[i * 2] = x;
+            starLast[i * 2 + 1] = y;
+          }
           const ignite = igniteRef.current?.[i] ?? 0;
           const tgt = igniteTargetRef.current?.[i] ?? 0;
           const velArr = igniteVelRef.current;
@@ -1129,8 +1412,11 @@ export default function OrbitalRing({
           const a = d <= reactRadius && d > 0.01 ? Math.pow(1 - d / reactRadius, 2) * 0.8 : 0;
           setAttr(line, "x1", x.toFixed(2));
           setAttr(line, "y1", y.toFixed(2));
-          setAttr(line, "x2", ptr.x.toFixed(2));
-          setAttr(line, "y2", ptr.y.toFixed(2));
+          // x2/y2 only change on mousemove — skip when pointer is stable.
+          if (ptrMoved) {
+            setAttr(line, "x2", ptrX2);
+            setAttr(line, "y2", ptrY2);
+          }
           setAttr(line, "opacity", a.toFixed(3));
         }
       }
@@ -1140,12 +1426,15 @@ export default function OrbitalRing({
       // smoothness loss is imperceptible and it halves the settled figure's
       // filter-pass cost (the filtered haloblur glows).
       const cstFig = constellationStateRef.current;
+      const outFig = constellationOutRef.current;
       const figSettled =
-        cstFig !== null && !constellationOutRef.current && t - cstFig.drawnAt > FIG_SETTLE_S;
-      if (figSettled) {
-        if (figSubRef.current++ % FIG_SUB_STEP === 0) paintConstellation(ptr, loopPos);
-      } else {
-        paintConstellation(ptr, loopPos);
+        cstFig !== null && !outFig && t - cstFig.drawnAt > FIG_SETTLE_S;
+      if (cstFig || outFig) {
+        if (figSettled) {
+          if (figSubRef.current++ % FIG_SUB_STEP === 0) paintConstellation(ptr, loopPos);
+        } else {
+          paintConstellation(ptr, loopPos);
+        }
       }
 
       // Anchor echo flare: 3-dot secondary sparkle flying out from the anchor as the burst fades.
@@ -1157,13 +1446,12 @@ export default function OrbitalRing({
           if (ap) {
             echo.style.transform = `translate(${ap[0].toFixed(2)}px,${ap[1].toFixed(2)}px)`;
             const be = burstRef.current;
-            const dir = [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3];
             for (let i = 0; i < echoDotRefs.current.length; i++) {
               const d = echoDotRefs.current[i];
               if (d) {
                 const r = ECHO_RADII[i] * size * (1 - be);
-                d.setAttribute("cx", (Math.cos(dir[i]) * r).toFixed(2));
-                d.setAttribute("cy", (Math.sin(dir[i]) * r).toFixed(2));
+                d.setAttribute("cx", (Math.cos(ECHO_DIR[i]) * r).toFixed(2));
+                d.setAttribute("cy", (Math.sin(ECHO_DIR[i]) * r).toFixed(2));
               }
             }
             echo.setAttribute("opacity", (ECHO_OP * be).toFixed(3));
@@ -1255,11 +1543,11 @@ export default function OrbitalRing({
       const s = stars[i];
       const d = Math.hypot(ptr.x - s.x, ptr.y - s.y);
       const a = d <= reactRadius && d > 0.01 ? Math.pow(1 - d / reactRadius, 2) * 0.8 : 0;
-      line.setAttribute("x1", s.x.toFixed(2));
-      line.setAttribute("y1", s.y.toFixed(2));
-      line.setAttribute("x2", ptr.x.toFixed(2));
-      line.setAttribute("y2", ptr.y.toFixed(2));
-      line.setAttribute("opacity", a.toFixed(3));
+      setAttr(line, "x1", s.x.toFixed(2));
+      setAttr(line, "y1", s.y.toFixed(2));
+      setAttr(line, "x2", ptr.x.toFixed(2));
+      setAttr(line, "y2", ptr.y.toFixed(2));
+      setAttr(line, "opacity", a.toFixed(3));
     }
   };
 
@@ -1391,6 +1679,7 @@ export default function OrbitalRing({
     burstRef.current = 1;
     pulseFiredRef.current = false;
     edgePulseRef.current = new Float32Array(edges.length);
+    if (glowLastRef.current) glowLastRef.current.fill(-1e9);
     // Static smoke + drift re-arm: fix the filtered wash geometry for this figure
     // and resume the slow cloud-drift (paintConstellation freezes it at settle).
     turbActiveRef.current = true;
@@ -1478,12 +1767,15 @@ export default function OrbitalRing({
 
   const handleLeave = () => {
     pointerRef.current = null;
+    lastPtrXRef.current = -1;
+    lastPtrYRef.current = -1;
     setHovering(false);
     constellationTargetAlphaRef.current = 0;
     lastNearestRef.current = -1;
     if (igniteTargetRef.current) igniteTargetRef.current.fill(0);
     if (igniteVelRef.current) igniteVelRef.current.fill(0);
     if (edgePulseRef.current) edgePulseRef.current.fill(0);
+    if (glowLastRef.current) glowLastRef.current.fill(-1e9);
     coilRef.current = 1;
     burstRef.current = 0;
     turbFrameRef.current = 0;
@@ -1729,6 +2021,7 @@ export default function OrbitalRing({
             ref={(el) => { starRefs.current[i] = el; }}
             opacity={s.base}
             transform={`translate(${s.x},${s.y})`}
+            style={{ willChange: "transform" }}
           >
             <circle cx={0} cy={0} r={s.glowR} fill={`url(#${id}-starglow)`} />
             <circle cx={0} cy={0} r={s.coreR} fill={`url(#${id}-cor-${s.hueIdx})`} />
@@ -1817,12 +2110,13 @@ export default function OrbitalRing({
                 key={`mote-${i}`}
                 ref={(el) => { moteRefs.current[i] = el; }}
                 transform={`translate(${x},${y})`}
+                style={{ willChange: "transform" }}
               >
                 <circle cx={0} cy={0} r={MOTE_R[i] * size} fill="#FFD08A" opacity={MOTE_OP[i]} filter={`url(#${id}-coreblur)`} />
               </g>
             ))}
 
-            <g ref={headRef} transform={`translate(${cometGeo.head[0]},${cometGeo.head[1]})`} opacity={cometHeadOpacity(cometGeo.rRatio)}>
+            <g ref={headRef} transform={`translate(${cometGeo.head[0]},${cometGeo.head[1]})`} opacity={cometHeadOpacity(cometGeo.rRatio)} style={{ willChange: "transform" }}>
               <circle cx={0} cy={0} r={size * 0.05} fill={`url(#${id}-comaglow)`} opacity="0.3" />
               <circle cx={0} cy={0} r={size * 0.032} fill={`url(#${id}-starglow)`} />
               <circle cx={0} cy={0} r={size * 0.016} fill="#7CFCA8" opacity="0.26" filter={`url(#${id}-coreblur)`} />
@@ -1936,17 +2230,22 @@ export default function OrbitalRing({
           />
         ))}
         {Array.from({ length: MAX_CONSTELLATION_EDGES }, (_, i) => (
-          <line
-            key={`glow-${i}`}
-            ref={(el) => { constellationGlowRefs.current[i] = el; }}
-            x1={0} y1={0} x2={0} y2={0}
-            stroke="#9BD4FF"
-            strokeWidth={4}
-            vectorEffect="non-scaling-stroke"
-            strokeLinecap="round"
-            filter={`url(#${id}-haloblur)`}
-            opacity="0"
-          />
+          <g
+            key={`glowwrap-${i}`}
+            ref={(el) => { constellationGlowWrapRefs.current[i] = el; }}
+            style={{ opacity: 0 }}
+          >
+            <line
+              ref={(el) => { constellationGlowRefs.current[i] = el; }}
+              x1={0} y1={0} x2={0} y2={0}
+              stroke="#9BD4FF"
+              strokeWidth={4}
+              vectorEffect="non-scaling-stroke"
+              strokeLinecap="round"
+              filter={`url(#${id}-haloblur)`}
+              opacity="1"
+            />
+          </g>
         ))}
         {Array.from({ length: MAX_CONSTELLATION_EDGES }, (_, i) => (
           <line
@@ -1958,9 +2257,6 @@ export default function OrbitalRing({
             vectorEffect="non-scaling-stroke"
             strokeLinecap="round"
             filter={`url(#${id}-haloblur)`}
-            pathLength={1}
-            strokeDasharray="1 1"
-            strokeDashoffset="1"
             opacity="0"
           />
         ))}

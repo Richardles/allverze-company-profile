@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import WhatsAppWidget from './components/WhatsAppWidget';
+import PerfHud from './components/PerfHud';
 import { ContactFormProvider } from './contact/ContactFormProvider';
 import { observeReveals } from './lib/reveal';
 import { CONTACT_FORM_ID } from './lib/contactNav';
@@ -120,6 +121,7 @@ export default function App() {
       <Footer />
       <WhatsAppWidget />
       <div aria-hidden="true" className="grain" />
+      <PerfHud />
     </div>
   );
 }
