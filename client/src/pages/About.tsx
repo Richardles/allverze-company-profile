@@ -64,30 +64,15 @@ const coreValues = [
       </svg>
     ),
     title: "Reliability",
-    quote: "99.9% SLA commitment",
-    desc: "When we commit to uptime, performance, or delivery timelines, those commitments are backed by engineering discipline.",
+    quote: "We keep the timeline we set",
+    desc: "When we commit to a delivery date or a standard of work, we back it with real planning and honest progress updates — no over-promising.",
   },
 ];
 
-const team = [
-  {
-    name: "Sarah Chen",
-    title: "Chief Executive Officer",
-    domain: "Corporate Strategy & Growth",
-    photo: "https://images.unsplash.com/photo-1573497019236-17f8177b81e8?w=480&h=480&fit=crop&auto=format&q=80",
-  },
-  {
-    name: "Marcus Wei",
-    title: "Chief Technology Officer",
-    domain: "Engineering & Architecture",
-    photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=480&h=480&fit=crop&auto=format&q=80",
-  },
-  {
-    name: "Priya Anand",
-    title: "Chief Operating Officer",
-    domain: "Operations & Client Delivery",
-    photo: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=480&h=480&fit=crop&auto=format&q=80",
-  },
+const people = [
+  { title: "Direct access", desc: "Email and WhatsApp reach the people doing the work — not a forwarding queue." },
+  { title: "Seniors on the job", desc: "The engineers who scope your project are the ones who build it." },
+  { title: "One accountable contact", desc: "A single point of contact per engagement, from kickoff to post-launch." },
 ];
 
 const pillars = ["Best Service", "Best Quality", "Integrity", "Reliability", "Professionalism"];
@@ -175,7 +160,7 @@ export default function About() {
               </div>
 
               <div className="flex flex-col gap-7">
-                <div className="reveal" data-reveal-delay="70">
+                <div className="reveal">
                   <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: "#38BDF8" }}>
                     The Orbital Ring
                   </p>
@@ -185,8 +170,8 @@ export default function About() {
                 </div>
 
                 <div className="flex flex-col gap-6">
-                  {orbitalStory.map((item, i) => (
-                    <div key={item.label} className="flex gap-4 reveal" data-reveal-delay={`${140 + i * 60}`}>
+                  {orbitalStory.map((item) => (
+                    <div key={item.label} className="flex gap-4">
                       <div
                         style={{
                           width: 6, height: 6, borderRadius: "50%",
@@ -223,7 +208,7 @@ export default function About() {
             {/* Vision */}
             <div
               style={{ background: "#0E2344", border: "1px solid rgba(56,189,248,0.20)", borderRadius: 16, padding: "40px" }}
-              className="card-hover reveal flex flex-col gap-5"
+              className="card-hover flex flex-col gap-5"
             >
               <div className="flex items-center gap-3">
                 <div style={{ width: 36, height: 36, borderRadius: 8, background: "rgba(56,189,248,0.12)", display: "flex", alignItems: "center", justifyContent: "center", color: "#38BDF8" }}>
@@ -237,15 +222,14 @@ export default function About() {
                 A trusted business partner that connects innovation, expertise, and integrity to create meaningful value for businesses and the community.
               </h3>
               <p style={{ fontSize: "0.875rem", color: "rgba(248,250,252,0.50)", lineHeight: 1.75 }}>
-                Every business, regardless of size, deserves enterprise-grade technology delivered with honesty, precision, and genuine care for outcomes.
+                Every business, regardless of size, deserves dependable technology delivered with honesty, precision, and genuine care for outcomes.
               </p>
             </div>
 
             {/* Mission */}
             <div
               style={{ background: missionBg, border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0"}`, borderRadius: 16, padding: "40px" }}
-              className="card-hover reveal flex flex-col gap-5"
-              data-reveal-delay="80"
+              className="card-hover flex flex-col gap-5"
             >
               <div className="flex items-center gap-3">
                 <div style={{ width: 36, height: 36, borderRadius: 8, background: "rgba(0,85,229,0.09)", display: "flex", alignItems: "center", justifyContent: "center", color: "#0055E5" }}>
@@ -295,8 +279,7 @@ export default function About() {
             {pillars.map((pillar, i) => (
               <div key={pillar} className="flex items-center gap-3">
                 <div
-                  className="pillar-chip reveal"
-                  data-reveal-delay={`${i * 50}`}
+                  className="pillar-chip"
                   style={{
                     background: pillabBg,
                     border: `1px solid ${pillBorder}`,
@@ -336,11 +319,10 @@ export default function About() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {coreValues.map((v, i) => (
+            {coreValues.map((v) => (
               <div
                 key={v.title}
-                className="card-hover group reveal flex flex-col gap-4 relative overflow-hidden"
-                data-reveal-delay={`${i * 70}`}
+                className="card-hover group flex flex-col gap-4 relative overflow-hidden"
                 style={{
                   background: "#0E2344",
                   border: "1px solid rgba(255,255,255,0.07)",
@@ -374,84 +356,58 @@ export default function About() {
         </div>
       </section>
 
-      {/* ── TEAM ──────────────────────────────────────────────── */}
+      {/* ── PEOPLE BEHIND THE WORK ────────────────────────────── */}
       <section style={{ background: colors.pageBg, paddingTop: 96, paddingBottom: 96 }} className="px-6 lg:px-12">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-14 reveal">
-            <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: "#0055E5" }}>
-              Leadership & Governance
-            </p>
-            <h2 style={{ fontSize: "clamp(1.9rem, 3.5vw, 2.5rem)", fontWeight: 700, color: colors.textPrimary, letterSpacing: "-0.02em" }}>
-              Our Team
-            </h2>
-            <p style={{ marginTop: 10, fontSize: "0.9375rem", color: colors.textSub }}>
-              Seasoned leaders with the depth to solve, not just advise.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl">
-            {team.map((member, i) => (
-              <div
-                key={member.name}
-                className="group reveal flex flex-col overflow-hidden card-hover"
-                data-reveal-delay={`${i * 80}`}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-start">
+            <div className="flex flex-col gap-6 reveal">
+              <p className="font-bold tracking-[0.14em] uppercase mb-1" style={{ fontSize: "0.6875rem", color: "#0055E5" }}>
+                Who You Work With
+              </p>
+              <h2 style={{ fontSize: "clamp(1.9rem, 3.5vw, 2.5rem)", fontWeight: 700, color: colors.textPrimary, letterSpacing: "-0.02em" }}>
+                The people behind the work
+              </h2>
+              <p
                 style={{
-                  background: colors.cardBg,
-                  border: `1px solid ${colors.cardBorder}`,
-                  borderRadius: 18,
-                  boxShadow: isDark
-                    ? "0 2px 16px rgba(0,0,0,0.35)"
-                    : "0 1px 4px rgba(0,0,0,0.05), 0 6px 20px rgba(0,0,0,0.06)",
+                  fontFamily: "Georgia, serif",
+                  fontStyle: "italic",
+                  fontSize: "clamp(1.4rem, 2.5vw, 1.85rem)",
+                  lineHeight: 1.45,
+                  color: colors.textPrimary,
                 }}
               >
-                <div style={{ height: 240, background: isDark ? "#0E2344" : "#DBEAFE", overflow: "hidden", position: "relative" }}>
-                  <img
-                    src={member.photo}
-                    alt={member.name}
-                    loading="lazy"
-                    className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-                  />
-                  {/* Gradient overlay on bottom of photo */}
+                "You'll never wonder who's actually doing the work."
+              </p>
+              <p style={{ fontSize: "0.9375rem", color: colors.textSub, lineHeight: 1.75 }}>
+                Allverze is a compact team of engineers, designers, and project managers who stay close to the work — and close to every client. The person you talk to at the start stays accountable through delivery.
+              </p>
+              <p style={{ fontSize: "0.875rem", color: colors.textSub, lineHeight: 1.7 }}>
+                <strong style={{ color: colors.textPrimary }}>Based in Jakarta (GMT+7)</strong> — happy to overlap with your working hours.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-6">
+              {people.map((p, i) => (
+                <div key={p.title} className="flex gap-4">
                   <div
-                    className="absolute bottom-0 left-0 right-0"
                     style={{
-                      height: 60,
-                      background: `linear-gradient(to top, ${isDark ? "rgba(11,29,53,0.85)" : "rgba(255,255,255,0.6)"} 0%, transparent 100%)`,
+                      width: 34, height: 34, borderRadius: 9,
+                      background: isDark ? "rgba(0,85,229,0.10)" : "rgba(0,85,229,0.08)",
+                      color: "#0055E5",
+                      fontSize: "0.72rem", fontWeight: 800,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
                     }}
-                  />
-                </div>
-                <div className="flex flex-col gap-2.5 p-5 flex-1">
+                  >
+                    {i + 1}
+                  </div>
                   <div>
-                    <div style={{ fontSize: "0.9375rem", fontWeight: 700, color: colors.textPrimary, letterSpacing: "-0.01em" }}>{member.name}</div>
-                    <div style={{ fontSize: "0.775rem", fontWeight: 600, color: "#0055E5", marginTop: 2 }}>{member.title}</div>
+                    <div style={{ fontSize: "0.95rem", fontWeight: 700, color: colors.textPrimary, marginBottom: 4, letterSpacing: "-0.01em" }}>{p.title}</div>
+                    <p style={{ fontSize: "0.875rem", color: colors.textSub, lineHeight: 1.7 }}>{p.desc}</p>
                   </div>
-                  <div
-                    style={{
-                      fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em",
-                      color: colors.tagColor,
-                      background: colors.tagBg,
-                      borderRadius: 5, padding: "3px 9px", alignSelf: "flex-start",
-                    }}
-                  >
-                    {member.domain}
-                  </div>
-                  <button
-                    className="mt-auto flex items-center gap-1.5 text-xs font-semibold transition-all hover:gap-2.5 focus-visible:outline-none"
-                    style={{ color: "#0055E5" }}
-                    onClick={() => window.open("https://linkedin.com", "_blank", "noopener")}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z" />
-                      <circle cx="4" cy="4" r="2" />
-                    </svg>
-                    LinkedIn Profile
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                      <path d="M5 12h14M12 5l7 7-7 7" />
-                    </svg>
-                  </button>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -470,7 +426,7 @@ export default function About() {
             className="flex-shrink-0 text-sm font-semibold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.98]"
             style={{ background: "#0055E5", borderRadius: 9, padding: "12px 28px", boxShadow: "0 2px 12px rgba(0,85,229,0.28)", whiteSpace: "nowrap" }}
           >
-            Start the Conversation →
+            Start the conversation →
           </button>
         </div>
       </section>

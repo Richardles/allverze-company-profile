@@ -6,7 +6,7 @@ import allverzeLogo from "../imports/logo.webp";
 
 const navLinks = [
   { label: "Home",     path: "/" },
-  { label: "About Us",    path: "/about" },
+  { label: "About",    path: "/about" },
   { label: "Services", path: "/services" },
   { label: "Contact",  path: "/contact" },
 ];

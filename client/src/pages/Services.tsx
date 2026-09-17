@@ -3,19 +3,18 @@ import { useTheme } from "../theme/ThemeContext";
 import { useThemeColors } from "../theme/useThemeColors";
 import { openContactForm, openServiceModule } from "../lib/contactNav";
 import { WHATSAPP_URL } from "../config";
-import ShieldIcon from "../components/ShieldIcon";
 
 const modules = [
   {
     tag: "01 — Engineering",
     title: "Custom Software Engineering",
     sub: "Web Applications · APIs · Enterprise Systems",
-    desc: "We design and build production-grade software systems tailored to your exact business requirements. From complex workflow automation to multi-tenant SaaS platforms, our engineering practice is grounded in clean architecture, rigorous testing, and long-term maintainability.",
+    desc: "We design and build the software your business runs on — workflow tools, integrations, internal systems, multi-tenant platforms. Clean code, real tests, and a codebase that stays maintainable long after handover.",
     bullets: [
       "Scalable web applications built with React and TypeScript",
       "RESTful and GraphQL API development with OpenAPI standards",
       "Microservices architecture on Kubernetes and serverless platforms",
-      "CI/CD pipelines with automated quality gates and zero-downtime deployment",
+      "CI/CD pipelines with automated quality gates and staged, safe deploys",
     ],
     dark: false,
   },
@@ -23,11 +22,11 @@ const modules = [
     tag: "02 — Mobile",
     title: "Mobile Application Development",
     sub: "iOS · Android · Cross-Platform",
-    desc: "We craft high-performance, pixel-perfect mobile applications that deliver exceptional user experiences across iOS and Android. From MVP to enterprise-scale, we ensure speed, reliability, and native-feel on every device your customers carry.",
+    desc: "iOS and Android apps that feel native on every device — from a first version to something used by thousands. Built for real-world networks and held to a careful standard of UX.",
     bullets: [
       "Native iOS (Swift) and Android (Kotlin) development",
       "Cross-platform builds with React Native and Expo",
-      "Seamless API integration with offline-first architecture",
+      "Apps built for real networks, with offline sync when connectivity drops",
       "App Store and Google Play submission and full lifecycle management",
     ],
     dark: true,
@@ -36,12 +35,12 @@ const modules = [
     tag: "03 — Observability",
     title: "Application Performance Monitoring",
     sub: "Real-Time Metrics · Distributed Tracing · Alerting",
-    desc: "Gain complete visibility into your application's health, performance, and user experience. We implement end-to-end observability stacks that surface issues before they affect customers — with intelligent alerting and root-cause analysis built in.",
+    desc: "We set up metrics, logs, and traceability so problems surface before your customers notice — with alerts that reach the right people and the context to respond fast.",
     bullets: [
       "Full-stack observability: metrics, logs, and distributed tracing",
       "Custom real-time dashboards with performance KPIs",
-      "Intelligent alerting with escalation policies and on-call integration",
-      "Proactive anomaly detection and incident response playbooks",
+      "Alerting with escalation policies and on-call integration",
+      "Anomaly detection and incident response playbooks",
     ],
     dark: false,
   },
@@ -49,7 +48,7 @@ const modules = [
     tag: "04 — Quality Assurance",
     title: "Performance & Automation Testing",
     sub: "Load Testing · Test Automation · CI Integration",
-    desc: "Deliver software that performs under pressure. We design comprehensive test automation frameworks and load testing strategies that catch regressions early, validate performance benchmarks, and integrate seamlessly into your delivery pipeline.",
+    desc: "Automated tests and load checks built into your pipeline, so regressions surface early and launches stay predictable. 'It works' means it's actually been verified.",
     bullets: [
       "End-to-end test automation with Playwright and Cypress",
       "Load and stress testing with k6, JMeter, and Gatling",
@@ -61,10 +60,10 @@ const modules = [
 ];
 
 const steps = [
-  { num: "01", label: "Discovery & Audit",       desc: "We map your current state — systems, gaps, risks, and opportunities — with precision before a single line of code is written." },
-  { num: "02", label: "Solution Architecture",    desc: "We design the right solution, not the most expensive one. Every blueprint is tied directly to your desired outcomes." },
-  { num: "03", label: "Execution & Hardening",    desc: "We build, test, and secure with rigorous engineering discipline and zero-downtime deployment practices." },
-  { num: "04", label: "Continuous Optimization",  desc: "Post-launch, we monitor, iterate, and improve — because Better Every Day doesn't stop at go-live." },
+  { num: "01", label: "Discovery & Audit",       desc: "We map your current state — systems, gaps, risks, and opportunities — before a single line of code is written." },
+  { num: "02", label: "Solution Architecture",    desc: "We design the right solution, not the most expensive one. Every blueprint ties back to the outcome you want." },
+  { num: "03", label: "Execution & Hardening",    desc: "We build, test, and secure in visible stages — with demos along the way and staged, careful deploys." },
+  { num: "04", label: "Continuous Optimization",  desc: "After go-live we monitor, iterate, and improve — because Better Every Day doesn't stop at launch." },
 ];
 
 export default function Services() {
@@ -82,7 +81,7 @@ export default function Services() {
         <div className="absolute inset-0 pointer-events-none dot-grid dot-grid--fade" style={{ opacity: 0.5 }} />
         <div className="max-w-7xl mx-auto relative">
           <p className="font-bold tracking-[0.14em] uppercase mb-5 fade-in-up" style={{ fontSize: "0.6875rem", color: "#38BDF8" }}>
-            Enterprise Solutions
+            What We Build
           </p>
           <h1
             className="fade-in-up fade-in-up-1"
@@ -95,11 +94,11 @@ export default function Services() {
               maxWidth: 700,
             }}
           >
-            Practical solutions.{" "}
-            <span style={{ color: "#38BDF8" }}>Uncompromising performance.</span>
+            Software work we're{" "}
+            <span style={{ color: "#38BDF8" }}>glad to put our name on.</span>
           </h1>
           <p className="fade-in-up fade-in-up-2" style={{ marginTop: 20, fontSize: "1.0625rem", color: "rgba(248,250,252,0.58)", lineHeight: 1.75, maxWidth: 520 }}>
-            Four deep-expertise capability domains. One integrated partner. Delivered with the integrity and discipline Allverze is built on.
+            Four areas of focus, one team behind them — scoped honestly, built in visible stages, and supported after launch.
           </p>
           {/* Service quick-nav */}
           <div className="flex flex-wrap gap-2 mt-8 fade-in-up fade-in-up-3">
@@ -160,8 +159,7 @@ export default function Services() {
                 {/* Visual pane */}
                 <div className={i % 2 === 1 ? "lg:col-start-2" : ""}>
                   <div
-                    className="module-pane card-hover reveal"
-                    data-reveal-delay={`${i * 40}`}
+                    className="module-pane card-hover"
                     style={{
                       borderRadius: 18,
                       overflow: "hidden",
@@ -217,7 +215,7 @@ export default function Services() {
                 </div>
 
                 {/* Content */}
-                <div className={`reveal flex flex-col gap-5 ${i % 2 === 1 ? "lg:col-start-1 lg:row-start-1" : ""}`} data-reveal-delay={`${i * 40 + 70}`}>
+                <div className={`reveal flex flex-col gap-5 ${i % 2 === 1 ? "lg:col-start-1 lg:row-start-1" : ""}`}>
                   <div>
                     <p style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: modAccent, marginBottom: 4 }}>
                       {mod.tag}
@@ -281,7 +279,7 @@ export default function Services() {
               The A to Z Workflow
             </h2>
             <p style={{ marginTop: 10, fontSize: "0.9375rem", color: colors.textSub, lineHeight: 1.7 }}>
-              Four phases, zero guesswork. Every engagement follows the same disciplined process.
+              The same four phases on every engagement — so you always know where we are and what comes next.
             </p>
           </div>
 
@@ -289,8 +287,7 @@ export default function Services() {
             {steps.map((step, i) => (
               <div
                 key={step.num}
-                className="card-hover reveal flex flex-col gap-4"
-                data-reveal-delay={`${i * 70}`}
+                className="card-hover flex flex-col gap-4"
                 style={{
                   background: colors.cardBg,
                   border: `1px solid ${colors.cardBorder}`,
@@ -330,17 +327,13 @@ export default function Services() {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-10">
           <div className="max-w-xl reveal">
             <h2 style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)", fontWeight: 700, color: "#F8FAFC", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
-              Ready to Solve Your Next Challenge?
+              Want to talk it through first?
             </h2>
             <p style={{ marginTop: 10, fontSize: "0.9375rem", color: "rgba(248,250,252,0.50)", lineHeight: 1.7 }}>
-              A direct conversation with engineers who understand your problem — no pitch decks, no generic proposals.
-            </p>
-            <p style={{ marginTop: 8, fontSize: "0.78rem", color: "rgba(248,250,252,0.30)", display: "flex", alignItems: "center", gap: 6 }}>
-              <ShieldIcon size={12} strokeWidth={2.2} />
-              100% Confidential. NDA Available Upon Request.
+              A direct conversation with the people who'd actually do the work. Tell us where you're stuck — you'll leave with a clear next step.
             </p>
           </div>
-          <div className="reveal flex flex-col sm:flex-row gap-3 flex-shrink-0" data-reveal-delay="80">
+          <div className="reveal flex flex-col sm:flex-row gap-3 flex-shrink-0">
             <button
               onClick={() => openContactForm(navigate)}
               className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-white transition-all duration-150 hover:opacity-90"
@@ -350,7 +343,7 @@ export default function Services() {
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                 <polyline points="22,6 12,13 2,6" />
               </svg>
-              Email Inquiry
+              Email us
             </button>
             <button
               onClick={() => window.open(WHATSAPP_URL, "_blank", "noopener")}

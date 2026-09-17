@@ -10,23 +10,23 @@ import ShieldIcon from "../components/ShieldIcon";
 const faqs = [
   {
     q: "How quickly can Allverze onboard a new project?",
-    a: "Most engagements begin within 5 to 10 business days of a signed agreement. For urgent timelines, expedited onboarding is available. Our first milestone is always a Discovery & Audit session — no assumptions, just facts.",
+    a: "Most engagements kick off within a few weeks of a signed agreement, with expedited onboarding for urgent timelines. We always start with a Discovery & Audit session before building anything — so the plan we give you is based on your situation, not a template.",
   },
   {
-    q: "Does Allverze comply with security and data protection standards?",
-    a: "Yes. We operate in accordance with ISO 27001 principles, GDPR-aligned data handling practices, and industry-specific compliance frameworks. All client data is processed under strict confidentiality protocols from day one.",
+    q: "Does Allverze handle security and data protection?",
+    a: "Yes. We follow common information-security practices — signed confidentiality agreements, restricted access, and careful handling of your data from day one. If your organisation works under a specific compliance framework, we'll map to it early in the engagement.",
   },
   {
-    q: "What are typical project timelines for enterprise engagements?",
-    a: "Advisory audits typically run 2 to 4 weeks. Custom software builds range from 8 to 24 weeks depending on complexity. We publish milestone-based delivery schedules during Solution Architecture so expectations are always aligned.",
+    q: "What are typical project timelines?",
+    a: "Discovery and advisory work usually takes 2 to 4 weeks. Custom software builds range from 8 to 24 weeks depending on complexity. We publish milestone-based delivery schedules up front, so expectations are set early and checked as we go.",
   },
   {
-    q: "Can we establish an NDA before discussing our project details?",
-    a: "Absolutely — and we encourage it. A mutual NDA can be executed before any technical or business details are shared. Simply request one in your inquiry and we'll have a signed agreement in place within 24 hours.",
+    q: "Can we establish an NDA before discussing details?",
+    a: "Absolutely — and we encourage it. A mutual NDA can be signed before any technical or business details are shared. Just ask for one in your inquiry and we'll get it in place quickly, usually within a day.",
   },
   {
-    q: "Do you work with early-stage startups or only enterprise clients?",
-    a: "We work with both. Whether you're a funded startup building your first product or an enterprise team modernizing legacy infrastructure, we tailor our engagement model to your stage, budget, and goals.",
+    q: "Do you work with early-stage startups or only enterprises?",
+    a: "Both. Whether you're a funded startup building your first product or an established team improving what you already run, we tailor the engagement to your stage, budget, and goals — and we'll tell you honestly if you don't need our help yet.",
   },
 ];
 
@@ -67,7 +67,7 @@ export default function Contact() {
         />
         <div className="max-w-7xl mx-auto relative">
           <p className="font-bold tracking-[0.14em] uppercase mb-5 fade-in-up" style={{ fontSize: "0.6875rem", color: "#38BDF8" }}>
-            Request a Strategy Call
+            Get in Touch
           </p>
           <h1
             className="fade-in-up fade-in-up-1"
@@ -80,16 +80,16 @@ export default function Contact() {
               maxWidth: 640,
             }}
           >
-            {"Let's solve your "}
-            <span style={{ color: "#38BDF8" }}>next challenge.</span>
+            {"Tell us what you're "}
+            <span style={{ color: "#38BDF8" }}>facing.</span>
           </h1>
           <p className="fade-in-up fade-in-up-2" style={{ marginTop: 18, fontSize: "1.0625rem", color: "rgba(248,250,252,0.55)", lineHeight: 1.75, maxWidth: 480 }}>
-            No sales scripts, no pressure — just a direct line to engineers and strategists who listen first.
+            No sales scripts, no pressure — just a direct line to the people who'd actually do the work. We'll give you an honest read on it.
           </p>
           <div className="flex items-center gap-2 mt-7 fade-in-up fade-in-up-3">
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
             <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "rgba(248,250,252,0.55)" }}>
-              Average response time: under 4 business hours
+              A real person replies within business hours
             </span>
           </div>
         </div>
@@ -105,7 +105,7 @@ export default function Contact() {
                 Direct Channels
               </h2>
               <p style={{ marginTop: 4, fontSize: "0.875rem", color: textMuted }}>
-                Reach us through the channel that works best for you.
+                Reach us on the channel you like best. We're a small team in Jakarta (GMT+7) and happy to work across time zones.
               </p>
             </div>
 
@@ -137,7 +137,6 @@ export default function Contact() {
             {/* WhatsApp card */}
             <div
               className="card-hover reveal"
-              data-reveal-delay="70"
               style={{
                 background: "#0B1D35",
                 border: "1px solid rgba(56,189,248,0.18)",
@@ -157,7 +156,7 @@ export default function Contact() {
                   </div>
                   <div>
                     <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "#F8FAFC" }}>WhatsApp Business</div>
-                    <div style={{ fontSize: "0.75rem", color: "rgba(248,250,252,0.40)" }}>Solutions Engineer · Direct line</div>
+                    <div style={{ fontSize: "0.75rem", color: "rgba(248,250,252,0.40)" }}>A real person, not a bot</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -170,29 +169,19 @@ export default function Contact() {
                 className="w-full text-sm font-bold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.99] flex items-center justify-center gap-2"
                 style={{ background: "linear-gradient(135deg,#25D366,#128C7E)", borderRadius: 9, padding: "11px" }}
               >
-                Chat with Solutions Engineer
+                Open WhatsApp chat
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                   <path d="M5 12h14M12 5l7 7-7 7" />
                 </svg>
               </button>
               <p style={{ fontSize: "0.72rem", textAlign: "center", color: "rgba(248,250,252,0.30)" }}>
-                Typically responds within minutes
+                Usually replies within business hours
               </p>
             </div>
 
             {/* Social links */}
-            <div className="reveal flex flex-wrap gap-3" data-reveal-delay="140">
+            <div className="reveal flex flex-wrap gap-3">
               {[
-                {
-                  label: "LinkedIn",
-                  href: "https://linkedin.com",
-                  icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="#0055E5"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z" /><circle cx="4" cy="4" r="2" /></svg>,
-                },
-                {
-                  label: "GitHub",
-                  href: "https://github.com",
-                  icon: <svg width="16" height="16" viewBox="0 0 24 24" fill={isDark ? "#F8FAFC" : "#0B1D35"}><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" /></svg>,
-                },
                 {
                   label: "Instagram",
                   href: "https://instagram.com",
@@ -219,28 +208,6 @@ export default function Contact() {
                   {s.label}
                 </a>
               ))}
-            </div>
-
-            {/* Trust signal */}
-            <div
-              className="reveal"
-              data-reveal-delay="210"
-              style={{
-                background: isDark ? "rgba(0,85,229,0.06)" : "rgba(0,85,229,0.04)",
-                border: `1px solid ${isDark ? "rgba(0,85,229,0.18)" : "rgba(0,85,229,0.12)"}`,
-                borderRadius: 10,
-                padding: "14px 16px",
-                display: "flex",
-                gap: 10,
-                alignItems: "flex-start",
-              }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0055E5" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 1 }}>
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
-              <p style={{ fontSize: "0.78rem", color: textSub, lineHeight: 1.6 }}>
-                All communications are 100% confidential. A mutual NDA can be signed before any details are shared.
-              </p>
             </div>
           </div>
 
@@ -275,7 +242,7 @@ export default function Contact() {
                 <div>
                   <h3 style={{ fontSize: "1.35rem", fontWeight: 700, color: textPrimary, letterSpacing: "-0.01em" }}>Message Received</h3>
                   <p style={{ marginTop: 8, fontSize: "0.9rem", color: textSub, maxWidth: 320, lineHeight: 1.7 }}>
-                    A Solutions Engineer will be in touch within one business day. Check your inbox.
+                    We'll reply within one business day. Check your inbox for confirmation.
                   </p>
                 </div>
                 {leadRef && (

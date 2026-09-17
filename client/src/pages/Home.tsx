@@ -1,10 +1,8 @@
-import { Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../theme/ThemeContext";
 import { useThemeColors } from "../theme/useThemeColors";
 import { openContactForm, openServiceModule } from "../lib/contactNav";
 import OrbitalRing from "../components/OrbitalRing";
-import ShieldIcon from "../components/ShieldIcon";
 
 const capabilities = [
   {
@@ -15,7 +13,7 @@ const capabilities = [
     ),
     tag: "Engineering",
     title: "Custom Software Engineering",
-    desc: "Production-grade web applications and enterprise systems built on clean architecture, rigorous testing, and long-term maintainability.",
+    desc: "Web applications and internal systems built to last — clean code, real testing, and a codebase we're happy to hand over and keep supporting.",
   },
   {
     icon: (
@@ -25,7 +23,7 @@ const capabilities = [
     ),
     tag: "Mobile",
     title: "Mobile Application Development",
-    desc: "High-performance iOS and Android applications with pixel-perfect UX, offline-first architecture, and seamless API integration.",
+    desc: "iOS and Android apps that feel native on every device — built for real-world networks, with a carefully considered user experience.",
   },
   {
     icon: (
@@ -35,7 +33,7 @@ const capabilities = [
     ),
     tag: "Observability",
     title: "Application Performance Monitoring",
-    desc: "End-to-end visibility into application health with real-time metrics, distributed tracing, and intelligent alerting before issues reach your users.",
+    desc: "Metrics, logs, and alerts wired together so your team hears about a problem before your customers do.",
   },
   {
     icon: (
@@ -45,72 +43,49 @@ const capabilities = [
     ),
     tag: "Quality Assurance",
     title: "Performance & Automation Testing",
-    desc: "Comprehensive test automation frameworks and load testing strategies that validate benchmarks and integrate into your CI/CD pipeline.",
+    desc: "Automated tests and load checks built into your delivery pipeline, so regressions surface early and shipping stays predictable.",
   },
 ];
 
 const trustItems = [
-  "99.9% Platform Reliability",
-  "Cross-Platform Mobile Apps",
-  "Real-Time APM Dashboards",
-  "Automated QA Pipelines",
-  "Enterprise-Grade Security",
-  "NDA Available On Request",
-  "End-to-End Test Automation",
-  "24 / 7 Engineering Support",
+  "React & TypeScript",
+  "iOS + Android Apps",
+  "Observability & Alerting",
+  "Test Automation",
+  "Better Every Day",
+  "We Solve — Not Just Sell",
+  "One Standard of Excellence",
+  "A to Z, Start to Finish",
 ];
 
-const metrics = [
-  { stat: "50+",      label: "Projects Delivered",   sub: "Web, mobile & cloud"        },
-  { stat: "< 10 days", label: "Average Onboarding",  sub: "From signed agreement"       },
-  { stat: "99.9%",    label: "SLA Maintained",        sub: "Across all production systems"},
-  { stat: "0",        label: "Scope Creep Incidents", sub: "Engineering discipline"      },
+const commitments = [
+  { title: "Scope before we quote", desc: "We map the work before we price it, so the number we give you is one we can stand behind." },
+  { title: "Build in visible stages", desc: "Milestones with demos along the way. Nothing is a surprise at the end." },
+  { title: "Support after launch", desc: "We stay on after go-live — monitoring, fixes, and improvements per agreement." },
+  { title: "An honest 'no', early", desc: "If you don't need something, we'll tell you. We'd rather lose a sale than sell the wrong thing." },
 ];
 
-const testimonials = [
-  {
-    quote: "Allverze delivered our entire platform in under 14 weeks. Their engineering discipline and post-launch support are unlike any vendor relationship we've had. They treated our problems as their own.",
-    name: "Lina K.",
-    role: "VP of Engineering",
-    company: "SaaS Startup",
-    photo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&h=120&fit=crop&auto=format&q=80",
-  },
-  {
-    quote: "The APM system they implemented transformed how we respond to incidents. What used to take hours now resolves in minutes. The visibility we gained is invaluable to our operations team.",
-    name: "Jason M.",
-    role: "CTO",
-    company: "Financial Services Firm",
-    photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&h=120&fit=crop&auto=format&q=80",
-  },
-  {
-    quote: "What sets Allverze apart is their integrity. They told us when our initial architecture was wrong — and saved us six months of rework. That kind of honesty is rare in any vendor relationship.",
-    name: "Siti A.",
-    role: "CEO",
-    company: "Enterprise Platform",
-    photo: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=120&h=120&fit=crop&auto=format&q=80",
-  },
-];
-
-const trustAvatars = [
-  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=40&h=40&fit=crop&auto=format&q=80",
-  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&fit=crop&auto=format&q=80",
-  "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=40&h=40&fit=crop&auto=format&q=80",
+const engagementSteps = [
+  { num: "01", title: "Scope together", desc: "Your goals, your constraints, and an honest estimate before we build anything." },
+  { num: "02", title: "Build in stages", desc: "Visible milestones with demos along the way — nothing is a surprise at the end." },
+  { num: "03", title: "Test before launch", desc: "Automated checks and load tests, not a quick look. We ship software we're sure about." },
+  { num: "04", title: "Stay after go-live", desc: "Monitoring, fixes, and improvements per agreement. We don't disappear at launch." },
 ];
 
 const philosophyStats = [
   {
     stat: "A to Z",
-    label: "Full-Spectrum Coverage",
+    label: "One partner, start to finish",
     icon: "◎",
   },
   {
-    stat: "99.9%",
-    label: "Platform Reliability SLA",
+    stat: "Reliable",
+    label: "We keep the timelines we set",
     icon: "◈",
   },
   {
-    stat: "Zero",
-    label: "Scope Creep. Ever.",
+    stat: "Honest",
+    label: "The right call, even when it's a no",
     icon: "◇",
   },
 ];
@@ -132,7 +107,6 @@ export default function Home() {
         <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(160deg, rgba(0,85,229,0.10) 0%, transparent 55%)" }} />
         <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 50% at 70% 50%, rgba(56,189,248,0.06) 0%, transparent 70%)" }} />
         <div className="absolute inset-0 pointer-events-none dot-grid dot-grid--fade" style={{ opacity: 0.55 }} />
-        <div aria-hidden="true" className="grain-iconic" />
 
         <div className="max-w-7xl mx-auto px-6 lg:px-12 w-full py-20 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div className="flex flex-col gap-6">
@@ -148,7 +122,7 @@ export default function Home() {
               }}
             >
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#38BDF8", flexShrink: 0, display: "inline-block" }} />
-              Technology Solutions Partner
+              Custom Software & Engineering
             </span>
 
             <h1
@@ -161,9 +135,8 @@ export default function Home() {
                 color: "#F8FAFC",
               }}
             >
-              Technology that moves{" "}
-              <span className="hero-gradient">your business</span>{" "}
-              forward.
+              Software that solves{" "}
+              <span className="hero-gradient">real problems.</span>
             </h1>
 
             {/* Tagline lockup */}
@@ -183,7 +156,7 @@ export default function Home() {
             </div>
 
             <p className="fade-in-up fade-in-up-3" style={{ fontSize: "1.0625rem", lineHeight: 1.78, color: "rgba(248,250,252,0.62)", maxWidth: 520 }}>
-              Allverze delivers end-to-end technology solutions — custom software, mobile applications, performance monitoring, and quality engineering — with the discipline and integrity modern business demands.
+              We build the software your business runs on — web and mobile applications, plus the monitoring and testing that keeps them dependable. We scope honestly, build in visible stages, and stay around after launch.
             </p>
 
             <div className="flex flex-wrap items-center gap-3 mt-1 fade-in-up fade-in-up-4">
@@ -212,7 +185,7 @@ export default function Home() {
                   padding: "12px 24px",
                 }}
               >
-                Start the Conversation
+                Start the conversation
               </button>
             </div>
 
@@ -224,28 +197,15 @@ export default function Home() {
               </span>
             </div>
 
-            {/* Social proof row */}
-            <div className="flex items-center gap-4 pt-2 fade-in-up fade-in-up-5">
-              <div className="flex -space-x-2">
-                {trustAvatars.map((src, i) => (
-                  <img
-                    key={i}
-                    src={src}
-                    alt=""
-                    style={{ width: 30, height: 30, borderRadius: "50%", border: "2px solid rgba(11,29,53,0.9)", objectFit: "cover" }}
-                  />
-                ))}
-              </div>
-              <div>
-                <div className="flex items-center gap-1">
-                  {[1,2,3,4,5].map((s) => (
-                    <svg key={s} width="11" height="11" viewBox="0 0 24 24" fill="#FBBF24">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
-                  ))}
-                </div>
-                <p style={{ fontSize: "0.72rem", color: "rgba(248,250,252,0.40)", marginTop: 1 }}>Trusted by growing teams · 100% confidential</p>
-              </div>
+            {/* Honest locality line */}
+            <div className="flex items-center gap-3 pt-1 fade-in-up fade-in-up-5">
+              <span className="relative inline-flex" style={{ width: 8, height: 8, flexShrink: 0 }}>
+                <span className="absolute inline-flex w-full h-full rounded-full animate-ping" style={{ background: "#38BDF8", opacity: 0.35 }} />
+                <span className="relative inline-flex rounded-full" style={{ width: 8, height: 8, background: "#38BDF8" }} />
+              </span>
+              <p style={{ fontSize: "0.8rem", color: "rgba(248,250,252,0.48)" }}>
+                A small team in Jakarta — replies within business hours, works across time zones.
+              </p>
             </div>
           </div>
 
@@ -291,62 +251,53 @@ export default function Home() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-2xl mx-auto mb-10 md:mb-12 reveal">
             <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: "#0055E5" }}>
-              Impact
+              How We Work
             </p>
             <h2 style={{ fontSize: "clamp(1.9rem, 3.5vw, 2.6rem)", fontWeight: 700, color: colors.textPrimary, letterSpacing: "-0.022em", lineHeight: 1.15 }}>
-              Proof, not promises.
+              How we keep promises.
             </h2>
             <p style={{ fontSize: "0.95rem", color: colors.textMuted, marginTop: 14 }}>
-              Four commitments, measured daily — every number is a promise we stand behind.
+              Four commitments that shape every engagement — no fine print.
             </p>
           </div>
-<div
-          className="relative overflow-hidden"
-          style={{
-            background: "linear-gradient(135deg, #0B1D35 0%, #060E1A 100%)",
-            border: "1px solid rgba(56, 189, 248, 0.14)",
-            borderRadius: 28,
-            boxShadow: isDark ? "none" : "0 24px 60px rgba(2, 8, 19, 0.28)",
-          }}
-        >
+
           <div
-            aria-hidden
-            className="absolute inset-0 pointer-events-none"
+            className="relative overflow-hidden"
             style={{
-              background: "radial-gradient(ellipse 70% 95% at 50% 0%, rgba(56,189,248,0.14), transparent 65%)",
+              background: "linear-gradient(135deg, #0B1D35 0%, #060E1A 100%)",
+              border: "1px solid rgba(56, 189, 248, 0.14)",
+              borderRadius: 28,
+              boxShadow: isDark ? "none" : "0 24px 60px rgba(2, 8, 19, 0.28)",
             }}
-          />
-          <div aria-hidden="true" className="grain-iconic" />
-            <div className="relative grid grid-cols-2 lg:flex gap-y-8">
-              {metrics.map((m, i) => (
-                <Fragment key={m.stat}>
-                  {i > 0 && (
-                    <div
-                      aria-hidden
-                      className="hidden lg:block self-center h-12 w-px shrink-0"
-                      style={{ background: "rgba(248,250,252,0.12)" }}
-                    />
-                  )}
-                  <div
-                    className="reveal flex flex-col items-center justify-center text-center gap-1.5 lg:flex-1"
-                    data-reveal-delay={`${i * 70}`}
-                    style={{ padding: "clamp(2rem, 3.5vw, 2.6rem) 1rem" }}
-                  >
+          >
+            <div
+              aria-hidden
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: "radial-gradient(ellipse 70% 95% at 50% 0%, rgba(56,189,248,0.14), transparent 65%)",
+              }}
+            />
+            <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-10 p-8 md:p-12">
+              {commitments.map((c) => (
+                <div key={c.title} className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2.5">
                     <span
-                      className="stat-gradient"
                       style={{
-                        fontSize: "clamp(2rem, 4vw, 2.8rem)",
-                        fontWeight: 800,
-                        letterSpacing: "-0.04em",
-                        lineHeight: 1.15,
+                        width: 26, height: 26, borderRadius: 8,
+                        background: "rgba(56,189,248,0.12)",
+                        color: "#38BDF8",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0,
                       }}
                     >
-                      {m.stat}
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
                     </span>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.16em", color: "#F8FAFC", marginTop: 4 }}>{m.label}</span>
-                    <span style={{ fontSize: "0.75rem", color: "rgba(248,250,252,0.55)" }}>{m.sub}</span>
+                    <span style={{ fontSize: "0.95rem", fontWeight: 700, color: "#F8FAFC", letterSpacing: "-0.01em" }}>{c.title}</span>
                   </div>
-                </Fragment>
+                  <p style={{ fontSize: "0.875rem", color: "rgba(248,250,252,0.55)", lineHeight: 1.7 }}>{c.desc}</p>
+                </div>
               ))}
             </div>
           </div>
@@ -363,11 +314,11 @@ export default function Home() {
               What We Do
             </p>
             <h2 style={{ fontSize: "clamp(1.9rem, 3.5vw, 2.6rem)", fontWeight: 700, color: "#F8FAFC", letterSpacing: "-0.022em", lineHeight: 1.15 }}>
-              Capability built for real{" "}
-              <span style={{ color: "#38BDF8" }}>business momentum</span>
+              Four things we're{" "}
+              <span style={{ color: "#38BDF8" }}>good at</span>
             </h2>
             <p style={{ marginTop: 12, fontSize: "0.9375rem", color: "rgba(248,250,252,0.55)", lineHeight: 1.7 }}>
-              End-to-end technology solutions built on precision engineering, not promises.
+              Each one backed by the same discipline — scope first, build in stages, test properly, stay around afterwards.
             </p>
           </div>
 
@@ -375,8 +326,7 @@ export default function Home() {
             {capabilities.map((cap, i) => (
               <div
                 key={cap.title}
-                className="card-hover group reveal flex flex-col gap-5"
-                data-reveal-delay={`${i * 70}`}
+                className="card-hover group flex flex-col gap-5"
                 style={{
                   background: "#0E2344",
                   border: "1px solid rgba(255,255,255,0.07)",
@@ -446,7 +396,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── TESTIMONIALS ──────────────────────────────────────── */}
+      {/* ── HOW ENGAGEMENTS RUN (editorial) ───────────────────── */}
       <section
         style={{
           background: isDark ? "#071526" : "#FFFFFF",
@@ -458,83 +408,55 @@ export default function Home() {
         className="px-6 lg:px-12 relative overflow-hidden"
       >
         <div aria-hidden="true" className="rim-glow-r" />
-        <div className="max-w-7xl mx-auto relative">
-          <div className="mb-14 reveal flex flex-col sm:flex-row sm:items-end justify-between gap-6">
-            <div>
-              <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: isDark ? "#38BDF8" : "#0055E5" }}>
-                Client Outcomes
-              </p>
-              <h2 style={{ fontSize: "clamp(1.9rem, 3.5vw, 2.5rem)", fontWeight: 700, color: colors.textPrimary, letterSpacing: "-0.022em", lineHeight: 1.15 }}>
-                What our clients say
-              </h2>
-            </div>
+        <div className="max-w-7xl mx-auto relative grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-start">
+          <div className="flex flex-col gap-6 reveal">
+            <p className="font-bold tracking-[0.14em] uppercase mb-1" style={{ fontSize: "0.6875rem", color: isDark ? "#38BDF8" : "#0055E5" }}>
+              How Engagements Run
+            </p>
+            <h2 style={{ fontSize: "clamp(1.9rem, 3.5vw, 2.5rem)", fontWeight: 700, color: colors.textPrimary, letterSpacing: "-0.022em", lineHeight: 1.15 }}>
+              What working with us looks like
+            </h2>
+            <p
+              style={{
+                fontFamily: "Georgia, serif",
+                fontStyle: "italic",
+                fontSize: "clamp(1.4rem, 2.5vw, 1.85rem)",
+                lineHeight: 1.45,
+                color: colors.textPrimary,
+              }}
+            >
+              "We'd rather lose a sale than sell you the wrong thing."
+            </p>
             <button
               onClick={() => openContactForm(navigate)}
-              className="self-start sm:self-auto flex-shrink-0 text-sm font-semibold transition-all hover:opacity-80"
-              style={{ color: isDark ? "#38BDF8" : "#0055E5", display: "flex", alignItems: "center", gap: 6 }}
+              className="self-start flex items-center gap-2 text-sm font-semibold transition-all hover:opacity-80"
+              style={{ color: isDark ? "#38BDF8" : "#0055E5", marginTop: 4 }}
             >
-              Start your engagement
+              Start the conversation
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {testimonials.map((t, i) => (
-              <div
-                key={i}
-                className="card-hover reveal flex flex-col gap-5"
-                data-reveal-delay={`${i * 70}`}
-                style={{
-                  background: isDark ? "#0B1D35" : "#FFFFFF",
-                  border: `1px solid ${isDark ? "rgba(56,189,248,0.12)" : "#E2E8F0"}`,
-                  borderRadius: 16,
-                  padding: "32px",
-                  boxShadow: isDark
-                    ? "0 1px 4px rgba(0,0,0,0.30), 0 4px 20px rgba(0,0,0,0.18)"
-                    : "0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.04)",
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-              >
-                {/* Decorative quote mark */}
+          <div className="flex flex-col gap-6">
+            {engagementSteps.map((s) => (
+              <div key={s.num} className="flex gap-4">
                 <div
-                  className="absolute top-4 right-5 pointer-events-none"
                   style={{
-                    fontSize: "5rem", fontWeight: 800, lineHeight: 1,
-                    color: isDark ? "rgba(56,189,248,0.07)" : "rgba(0,85,229,0.06)",
-                    fontFamily: "Georgia, serif",
-                    userSelect: "none",
+                    width: 34, height: 34, borderRadius: 9,
+                    background: isDark ? "rgba(56,189,248,0.10)" : "rgba(0,85,229,0.08)",
+                    color: isDark ? "#38BDF8" : "#0055E5",
+                    fontSize: "0.72rem", fontWeight: 800,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
                   }}
                 >
-                  "
+                  {s.num}
                 </div>
-
-                {/* Stars */}
-                <div className="flex gap-0.5">
-                  {[1,2,3,4,5].map((s) => (
-                    <svg key={s} width="13" height="13" viewBox="0 0 24 24" fill="#FBBF24">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
-                  ))}
-                </div>
-
-                <p style={{ fontSize: "0.9rem", color: isDark ? "rgba(248,250,252,0.68)" : colors.textSub, lineHeight: 1.78, flex: 1 }}>
-                  "{t.quote}"
-                </p>
-
-                <div className="flex items-center gap-3 pt-2" style={{ borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : colors.cardBorder}` }}>
-                  <img
-                    src={t.photo}
-                    alt={t.name}
-                    loading="lazy"
-                    style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", border: `2px solid ${isDark ? "rgba(56,189,248,0.25)" : "rgba(0,85,229,0.25)"}`, flexShrink: 0 }}
-                  />
-                  <div>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 700, color: colors.textPrimary }}>{t.name}</div>
-                    <div style={{ fontSize: "0.75rem", color: colors.textMuted }}>{t.role}, {t.company}</div>
-                  </div>
+                <div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: colors.textPrimary, marginBottom: 4, letterSpacing: "-0.01em" }}>{s.title}</div>
+                  <p style={{ fontSize: "0.875rem", color: colors.textSub, lineHeight: 1.7 }}>{s.desc}</p>
                 </div>
               </div>
             ))}
@@ -562,8 +484,8 @@ export default function Home() {
               Better Every Day.
             </h2>
             <p style={{ fontSize: "1rem", color: "rgba(248,250,252,0.58)", lineHeight: 1.78, maxWidth: 480 }}>
-              At Allverze, continuous improvement is the engine behind every decision, every delivery, and every
-              relationship. We measure success by the compounding value we create for clients over time.
+              We don't claim to be perfect — we aim to get better every day. That's the standard behind
+              every decision, every delivery, and every relationship we keep.
             </p>
             <div className="flex flex-wrap gap-3 mt-1">
               <button
@@ -571,7 +493,7 @@ export default function Home() {
                 className="text-sm font-semibold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.98]"
                 style={{ background: "#0055E5", borderRadius: 9, padding: "11px 24px", boxShadow: "0 2px 12px rgba(0,85,229,0.30)" }}
               >
-                Start the Conversation
+                Start the conversation
               </button>
               <button
                 onClick={() => navigate("/about")}
@@ -587,8 +509,8 @@ export default function Home() {
             className="grid grid-cols-1 sm:grid-cols-3 gap-px"
             style={{ background: "rgba(248,250,252,0.08)", borderRadius: 16, overflow: "hidden" }}
           >
-            {philosophyStats.map((s, i) => (
-              <div key={s.stat} className="reveal flex flex-col gap-2 p-8" data-reveal-delay={`${i * 70}`} style={{ background: "#0B1D35" }}>
+            {philosophyStats.map((s) => (
+              <div key={s.stat} className="flex flex-col gap-2 p-8" style={{ background: "#0B1D35" }}>
                 <span style={{ fontSize: "0.85rem", color: "rgba(56,189,248,0.55)" }}>{s.icon}</span>
                 <span style={{ fontSize: "2rem", fontWeight: 800, color: "#F8FAFC", letterSpacing: "-0.03em", lineHeight: 1 }}>
                   {s.stat}
@@ -628,17 +550,17 @@ export default function Home() {
             </svg>
           </div>
 
-          <div className="reveal" data-reveal-delay="70">
+          <div className="reveal">
             <h2 style={{ fontSize: "clamp(1.9rem, 4vw, 2.8rem)", fontWeight: 800, color: "#F8FAFC", letterSpacing: "-0.025em", lineHeight: 1.12 }}>
               Ready to build something{" "}
               <span style={{ color: "#38BDF8" }}>that lasts?</span>
             </h2>
             <p style={{ margin: "16px auto 0", fontSize: "1rem", color: "rgba(248,250,252,0.52)", lineHeight: 1.78, maxWidth: 480 }}>
-              A 30-minute strategy call is all it takes to understand your challenge and outline a path forward. No decks, no pressure — just engineers who listen first.
+              A 30-minute call is enough to understand your challenge and sketch a way forward. No decks, no pressure — you'll leave with a clear next step either way.
             </p>
           </div>
 
-          <div className="reveal flex flex-wrap justify-center gap-3" data-reveal-delay="140">
+          <div className="reveal flex flex-wrap justify-center gap-3">
             <button
               onClick={() => openContactForm(navigate)}
               className="group cta-glow inline-flex items-center gap-2 text-sm font-semibold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.98]"
@@ -649,7 +571,7 @@ export default function Home() {
                 boxShadow: "var(--glow-base, 0 0 0 0 rgba(0,85,229,0), 0 2px 18px rgba(0,85,229,0.40))",
               }}
             >
-              Request a Strategy Call
+              Let's Talk
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="transition-transform duration-200 group-hover:translate-x-0.5">
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>
@@ -663,26 +585,9 @@ export default function Home() {
             </button>
           </div>
 
-          <p
-            className="reveal"
-            data-reveal-delay="210"
-            style={{
-              fontSize: "0.75rem",
-              color: "rgba(248,250,252,0.25)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 6,
-            }}
-          >
-            <ShieldIcon size={12} strokeWidth={2.2} />
-            100% Confidential &nbsp;·&nbsp; NDA Available &nbsp;·&nbsp; No commitment required
-          </p>
-
           {/* Brand signature close */}
           <div
             className="reveal flex flex-wrap items-center justify-center gap-x-4 gap-y-1"
-            data-reveal-delay="280"
             style={{ marginTop: 4 }}
           >
             <span className="hidden sm:block h-px" style={{ flex: "1 1 56px", maxWidth: 56, background: "rgba(248,250,252,0.08)" }} />

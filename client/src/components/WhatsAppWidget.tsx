@@ -32,10 +32,10 @@ export default function WhatsAppWidget() {
             textOverflow: "ellipsis",
           }}
         >
-          Chat with Solutions Engineer
+          Chat with the team
         </div>
         <div className="text-xs font-medium mt-1 mr-1" style={{ color: "#38BDF8" }}>
-          Typically replies in minutes
+          Replies within business hours
         </div>
       </div>
 
