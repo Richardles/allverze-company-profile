@@ -1,8 +1,12 @@
+import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../theme/ThemeContext";
 import { useThemeColors } from "../theme/useThemeColors";
 import { openContactForm, openServiceModule } from "../lib/contactNav";
 import OrbitalRing from "../components/OrbitalRing";
+import LogoShimmer from "../components/LogoShimmer";
+import ProcessFlow from "../components/ProcessFlow";
+import logoFull from "../imports/logo-full.png";
 
 const capabilities = [
   {
@@ -94,125 +98,155 @@ export default function Home() {
   const navigate = useNavigate();
   const { isDark } = useTheme();
   const colors = useThemeColors();
+  const heroRef = useRef<HTMLElement | null>(null);
+  const markRef = useRef<HTMLImageElement | null>(null);
 
   return (
     <main>
-      {/* ── HERO ──────────────────────────────────────────────── */}
+      {/* ── HERO ── pure cinematic: the orbital system forms across the
+             whole viewport (stars scatter → drift in → whip → settle), then
+             scrolling reveals the copy below. ─────────────────────── */}
       <section
+        ref={heroRef}
         style={{ paddingTop: 72, background: "#0B1D35" }}
-        className="home-hero-height relative overflow-hidden flex items-center"
+        className="home-hero-height relative overflow-hidden flex items-center justify-center"
       >
         {/* Layered ambient gradients (texture system) */}
         <div aria-hidden="true" className="crown-glow crown-glow--hero" />
-        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(160deg, rgba(0,85,229,0.10) 0%, transparent 55%)" }} />
-        <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 50% at 70% 50%, rgba(56,189,248,0.06) 0%, transparent 70%)" }} />
-        <div className="absolute inset-0 pointer-events-none dot-grid dot-grid--fade" style={{ opacity: 0.55 }} />
+        <div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(160deg, rgba(0,85,229,0.10) 0%, transparent 55%)" }} />
+        <div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 50% at 70% 50%, rgba(56,189,248,0.06) 0%, transparent 70%)" }} />
+        <div aria-hidden="true" className="absolute inset-0 pointer-events-none dot-grid dot-grid--fade" style={{ opacity: 0.55 }} />
 
-        <div className="max-w-7xl mx-auto px-6 lg:px-12 w-full py-20 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div className="flex flex-col gap-6">
-            {/* Eyebrow */}
+        {/* Allverze lockup as a faint background silhouette behind the ring */}
+        <img
+          ref={markRef}
+          src={logoFull}
+          alt=""
+          role="presentation"
+          aria-hidden="true"
+          draggable={false}
+          className="hero-pod__mark"
+        />
+
+        {/* Shimmering dot-stars masked to the silhouette (cool white/cyan,
+            independent breathing) — the logo glimmers behind the ring. */}
+        <LogoShimmer src={logoFull} />
+
+        {/* The ring itself — the birth stars scatter across the Allverze
+            silhouette (scatterGuideRef) with a soft spill, then drift in to
+            their orbit slots; the hero section remains the fallback field. */}
+        <div className="orbital-float" style={{ maxWidth: "min(480px, 82vw)", width: "100%", marginInline: "auto", position: "relative", zIndex: 1 }}>
+          <OrbitalRing size={480} variant="constellation" speed="majestic" birth scatterFieldRef={heroRef} scatterGuideRef={markRef} />
+        </div>
+
+        {/* Scroll cue: a quiet cyan drip that invites the fold below */}
+        <div aria-hidden="true" className="hero-scroll-cue">
+          <span className="hero-scroll-cue__track">
+            <span className="hero-scroll-cue__dot" />
+          </span>
+        </div>
+      </section>
+
+      {/* ── HERO COPY ── first text on the page, revealed on scroll ── */}
+      <section className="relative overflow-hidden" style={{ background: "#0B1D35" }}>
+        <div className="max-w-3xl mx-auto px-6 lg:px-12 py-20 lg:py-28 flex flex-col items-center gap-6 text-center">
+          {/* Eyebrow */}
+          <span
+            className="reveal inline-flex items-center gap-2 text-xs font-bold tracking-[0.14em] uppercase"
+            style={{
+              color: "#38BDF8",
+              background: "rgba(56,189,248,0.10)",
+              border: "1px solid rgba(56,189,248,0.22)",
+              borderRadius: 6,
+              padding: "5px 12px",
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#38BDF8", flexShrink: 0, display: "inline-block" }} />
+            Custom Software & Engineering
+          </span>
+
+          <h1
+            className="reveal"
+            style={{
+              fontSize: "clamp(2.6rem, 5vw, 3.9rem)",
+              fontWeight: 800,
+              lineHeight: 1.07,
+              letterSpacing: "-0.028em",
+              color: "#F8FAFC",
+            }}
+          >
+            Software that solves{" "}
+            <span className="hero-gradient">real problems.</span>
+          </h1>
+
+          {/* Tagline lockup */}
+          <div className="reveal flex items-center justify-center gap-3">
+            <span className="h-px w-10 shrink-0" style={{ background: "rgba(248,250,252,0.18)" }} />
             <span
-              className="inline-flex items-center gap-2 self-start text-xs font-bold tracking-[0.14em] uppercase fade-in-up"
+              className="tracking-[0.22em] sm:tracking-[0.32em]"
               style={{
-                color: "#38BDF8",
-                background: "rgba(56,189,248,0.10)",
-                border: "1px solid rgba(56,189,248,0.22)",
-                borderRadius: 6,
-                padding: "5px 12px",
+                fontSize: "0.7rem",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                color: "rgba(248,250,252,0.48)",
               }}
             >
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#38BDF8", flexShrink: 0, display: "inline-block" }} />
-              Custom Software & Engineering
+              Connecting Possibilities
             </span>
-
-            <h1
-              className="fade-in-up fade-in-up-1"
-              style={{
-                fontSize: "clamp(2.6rem, 5vw, 3.9rem)",
-                fontWeight: 800,
-                lineHeight: 1.07,
-                letterSpacing: "-0.028em",
-                color: "#F8FAFC",
-              }}
-            >
-              Software that solves{" "}
-              <span className="hero-gradient">real problems.</span>
-            </h1>
-
-            {/* Tagline lockup */}
-            <div className="flex items-center gap-3 fade-in-up fade-in-up-2">
-              <span className="h-px w-10 shrink-0" style={{ background: "rgba(248,250,252,0.18)" }} />
-              <span
-                className="tracking-[0.22em] sm:tracking-[0.32em]"
-                style={{
-                  fontSize: "0.7rem",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  color: "rgba(248,250,252,0.48)",
-                }}
-              >
-                Connecting Possibilities
-              </span>
-            </div>
-
-            <p className="fade-in-up fade-in-up-3" style={{ fontSize: "1.0625rem", lineHeight: 1.78, color: "rgba(248,250,252,0.62)", maxWidth: 520 }}>
-              We build the software your business runs on — web and mobile applications, plus the monitoring and testing that keeps them dependable. We scope honestly, build in visible stages, and stay around after launch.
-            </p>
-
-            <div className="flex flex-wrap items-center gap-3 mt-1 fade-in-up fade-in-up-4">
-              <button
-                onClick={() => navigate("/services")}
-                className="group cta-glow inline-flex items-center gap-2 text-sm font-semibold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.98]"
-                style={{
-                  background: "#0055E5",
-                  borderRadius: 9,
-                  padding: "12px 24px",
-                  boxShadow: "var(--glow-base, 0 0 0 0 rgba(0,85,229,0), 0 2px 16px rgba(0,85,229,0.38))",
-                }}
-              >
-                Explore Services
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="transition-transform duration-200 group-hover:translate-x-0.5">
-                  <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-              </button>
-              <button
-                onClick={() => openContactForm(navigate)}
-                className="inline-flex items-center gap-2 text-sm font-semibold transition-all duration-150 hover:bg-white/5"
-                style={{
-                  color: "rgba(248,250,252,0.80)",
-                  border: "1px solid rgba(248,250,252,0.18)",
-                  borderRadius: 9,
-                  padding: "12px 24px",
-                }}
-              >
-                Start the conversation
-              </button>
-            </div>
-
-            {/* Slogan divider (brand) */}
-            <div className="flex items-center gap-3 pt-1 fade-in-up fade-in-up-4">
-              <div className="h-px flex-1" style={{ background: "rgba(248,250,252,0.08)", maxWidth: 40 }} />
-              <span style={{ fontSize: "0.78rem", color: "rgba(248,250,252,0.38)", fontStyle: "italic" }}>
-                We Solve — Not Just Sell &nbsp;&middot;&nbsp; Better Every Day
-              </span>
-            </div>
-
-            {/* Honest locality line */}
-            <div className="flex items-center gap-3 pt-1 fade-in-up fade-in-up-5">
-              <span className="relative inline-flex" style={{ width: 8, height: 8, flexShrink: 0 }}>
-                <span className="absolute inline-flex w-full h-full rounded-full animate-ping" style={{ background: "#38BDF8", opacity: 0.35 }} />
-                <span className="relative inline-flex rounded-full" style={{ width: 8, height: 8, background: "#38BDF8" }} />
-              </span>
-              <p style={{ fontSize: "0.8rem", color: "rgba(248,250,252,0.48)" }}>
-                A small team in Jakarta — replies within business hours, works across time zones.
-              </p>
-            </div>
           </div>
 
-          <div className="flex justify-center lg:justify-end">
-            <div className="orbital-float" style={{ maxWidth: "min(480px, 82vw)", width: "100%" }}>
-              <OrbitalRing size={480} variant="constellation" speed="majestic" />
-            </div>
+          <p className="reveal" style={{ fontSize: "1.0625rem", lineHeight: 1.78, color: "rgba(248,250,252,0.62)", maxWidth: 520 }}>
+            We build the software your business runs on — web and mobile applications, plus the monitoring and testing that keeps them dependable. We scope honestly, build in visible stages, and stay around after launch.
+          </p>
+
+          <div className="reveal flex flex-wrap items-center justify-center gap-3 mt-1">
+            <button
+              onClick={() => navigate("/services")}
+              className="group cta-glow inline-flex items-center gap-2 text-sm font-semibold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.98]"
+              style={{
+                background: "#0055E5",
+                borderRadius: 9,
+                padding: "12px 24px",
+                boxShadow: "var(--glow-base, 0 0 0 0 rgba(0,85,229,0), 0 2px 16px rgba(0,85,229,0.38))",
+              }}
+            >
+              Explore Services
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="transition-transform duration-200 group-hover:translate-x-0.5">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </button>
+            <button
+              onClick={() => openContactForm(navigate)}
+              className="inline-flex items-center gap-2 text-sm font-semibold transition-all duration-150 hover:bg-white/5"
+              style={{
+                color: "rgba(248,250,252,0.80)",
+                border: "1px solid rgba(248,250,252,0.18)",
+                borderRadius: 9,
+                padding: "12px 24px",
+              }}
+            >
+              Start the conversation
+            </button>
+          </div>
+
+          {/* Slogan divider (brand) */}
+          <div className="reveal flex items-center justify-center gap-3 pt-1">
+            <div className="h-px" style={{ background: "rgba(248,250,252,0.08)", width: 40 }} />
+            <span style={{ fontSize: "0.78rem", color: "rgba(248,250,252,0.38)", fontStyle: "italic" }}>
+              We Solve — Not Just Sell &nbsp;&middot;&nbsp; Better Every Day
+            </span>
+            <div className="h-px" style={{ background: "rgba(248,250,252,0.08)", width: 40 }} />
+          </div>
+
+          {/* Honest locality line */}
+          <div className="reveal flex items-center justify-center gap-3 pt-1">
+            <span className="relative inline-flex" style={{ width: 8, height: 8, flexShrink: 0 }}>
+              <span className="absolute inline-flex w-full h-full rounded-full animate-ping" style={{ background: "#38BDF8", opacity: 0.35 }} />
+              <span className="relative inline-flex rounded-full" style={{ width: 8, height: 8, background: "#38BDF8" }} />
+            </span>
+            <p style={{ fontSize: "0.8rem", color: "rgba(248,250,252,0.48)" }}>
+              A small team in Jakarta — replies within business hours, works across time zones.
+            </p>
           </div>
         </div>
       </section>
@@ -250,7 +284,7 @@ export default function Home() {
       >
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-2xl mx-auto mb-10 md:mb-12 reveal">
-            <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: "#0055E5" }}>
+            <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: "#38BDF8" }}>
               How We Work
             </p>
             <h2 style={{ fontSize: "clamp(1.9rem, 3.5vw, 2.6rem)", fontWeight: 700, color: colors.textPrimary, letterSpacing: "-0.022em", lineHeight: 1.15 }}>
@@ -396,10 +430,102 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── SELECTED WORK + WORD OF MOUTH (honest scaffold) ─── */}
+      <section style={{ background: colors.pageBg, paddingTop: 96, paddingBottom: 96 }} className="px-6 lg:px-12">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-14 lg:gap-20 items-start">
+          {/* Selected work */}
+          <div className="flex flex-col gap-8 reveal">
+            <div>
+              <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: colors.signalAccent }}>
+                Selected Work
+              </p>
+              <h2 style={{ fontSize: "clamp(1.9rem, 3.5vw, 2.5rem)", fontWeight: 700, color: colors.textPrimary, letterSpacing: "-0.022em", lineHeight: 1.15 }}>
+                Proof we can stand behind.
+              </h2>
+              <p style={{ marginTop: 10, fontSize: "0.9375rem", color: colors.textSub, lineHeight: 1.75 }}>
+                Real projects land here as they ship — scope, timeline, and result, with our name on the line. No invented logos, no borrowed screenshots. Until then, we'd rather show you our work in person.
+              </p>
+            </div>
+
+            <div className="flex flex-col">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-4"
+                  style={{
+                    padding: "20px 0",
+                    borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "#E9EEF5"}`,
+                    borderBottom: i === 2 ? `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "#E9EEF5"}` : "none",
+                    opacity: 0.85,
+                  }}
+                >
+                  <div
+                    className="tnum shrink-0"
+                    style={{
+                      width: 40, height: 40, borderRadius: 10,
+                      background: isDark ? "rgba(0,85,229,0.12)" : "rgba(0,85,229,0.08)",
+                      color: "#0055E5",
+                      fontSize: "0.78rem", fontWeight: 800,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    {`0${i + 1}`}
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <p style={{ fontSize: "0.9375rem", fontWeight: 600, color: colors.textPrimary, letterSpacing: "-0.01em" }}>
+                      An honest case study — reserved
+                    </p>
+                    <p style={{ fontSize: "0.8125rem", color: colors.textMuted }}>
+                      Filled in once a real engagement ships. Scope, timeline, result — nothing invented.
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Word of mouth */}
+          <div
+            className="reveal flex flex-col gap-5 lg:mt-24"
+            style={{
+              background: colors.cardBg,
+              border: `1px solid ${colors.cardBorder}`,
+              borderRadius: 16,
+              padding: "28px 26px",
+            }}
+          >
+            <p className="font-bold tracking-[0.14em] uppercase" style={{ fontSize: "0.6875rem", color: colors.signalAccent }}>
+              Word of Mouth
+            </p>
+            <p
+              style={{
+                fontFamily: "'Instrument Serif', Georgia, serif",
+                fontStyle: "italic",
+                fontSize: "clamp(1.4rem, 2.5vw, 1.8rem)",
+                lineHeight: 1.5,
+                color: colors.textPrimary,
+              }}
+            >
+              "This space is reserved for a client story we've earned — not one we've written ourselves."
+            </p>
+            <p style={{ fontSize: "0.9rem", color: colors.textSub, lineHeight: 1.75 }}>
+              The best proof we can show today is an honest conversation. Ask us for references — we'll point you at clients who've actually worked with us.
+            </p>
+            <button
+              onClick={() => openContactForm(navigate)}
+              className="self-start text-sm font-semibold transition-all duration-150 hover:opacity-80 active:scale-[0.98]"
+              style={{ color: colors.signalAccent, marginTop: 2 }}
+            >
+              Request references →
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* ── HOW ENGAGEMENTS RUN (editorial) ───────────────────── */}
       <section
         style={{
-          background: isDark ? "#071526" : "#FFFFFF",
+          background: colors.surfaceTrack,
           borderTop: `1px solid ${isDark ? "rgba(0,85,229,0.12)" : "rgba(11,29,53,0.08)"}`,
           borderBottom: `1px solid ${isDark ? "rgba(0,85,229,0.12)" : "rgba(11,29,53,0.08)"}`,
           paddingTop: 96,
@@ -410,7 +536,7 @@ export default function Home() {
         <div aria-hidden="true" className="rim-glow-r" />
         <div className="max-w-7xl mx-auto relative grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-start">
           <div className="flex flex-col gap-6 reveal">
-            <p className="font-bold tracking-[0.14em] uppercase mb-1" style={{ fontSize: "0.6875rem", color: isDark ? "#38BDF8" : "#0055E5" }}>
+            <p className="font-bold tracking-[0.14em] uppercase mb-1" style={{ fontSize: "0.6875rem", color: colors.signalAccent }}>
               How Engagements Run
             </p>
             <h2 style={{ fontSize: "clamp(1.9rem, 3.5vw, 2.5rem)", fontWeight: 700, color: colors.textPrimary, letterSpacing: "-0.022em", lineHeight: 1.15 }}>
@@ -418,7 +544,7 @@ export default function Home() {
             </h2>
             <p
               style={{
-                fontFamily: "Georgia, serif",
+                fontFamily: "'Instrument Serif', Georgia, serif",
                 fontStyle: "italic",
                 fontSize: "clamp(1.4rem, 2.5vw, 1.85rem)",
                 lineHeight: 1.45,
@@ -430,7 +556,7 @@ export default function Home() {
             <button
               onClick={() => openContactForm(navigate)}
               className="self-start flex items-center gap-2 text-sm font-semibold transition-all hover:opacity-80"
-              style={{ color: isDark ? "#38BDF8" : "#0055E5", marginTop: 4 }}
+              style={{ color: colors.signalAccent, marginTop: 4 }}
             >
               Start the conversation
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
@@ -440,26 +566,7 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col gap-6">
-            {engagementSteps.map((s) => (
-              <div key={s.num} className="flex gap-4">
-                <div
-                  style={{
-                    width: 34, height: 34, borderRadius: 9,
-                    background: isDark ? "rgba(56,189,248,0.10)" : "rgba(0,85,229,0.08)",
-                    color: isDark ? "#38BDF8" : "#0055E5",
-                    fontSize: "0.72rem", fontWeight: 800,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  {s.num}
-                </div>
-                <div>
-                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: colors.textPrimary, marginBottom: 4, letterSpacing: "-0.01em" }}>{s.title}</div>
-                  <p style={{ fontSize: "0.875rem", color: colors.textSub, lineHeight: 1.7 }}>{s.desc}</p>
-                </div>
-              </div>
-            ))}
+            <ProcessFlow steps={engagementSteps} variant="editorial" />
           </div>
         </div>
       </section>

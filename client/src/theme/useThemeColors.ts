@@ -5,6 +5,8 @@ export interface ThemeColors {
   pageBg: string;
   cardBg: string;
   cardBorder: string;
+  surfaceTrack: string;
+  signalAccent: string;
   textPrimary: string;
   textSub: string;
   textMuted: string;
@@ -25,6 +27,8 @@ export function useThemeColors(): ThemeColors {
     pageBg: isDark ? "#060E1A" : "#F8FAFC",
     cardBg: isDark ? "#0B1D35" : "#FFFFFF",
     cardBorder: isDark ? "rgba(255,255,255,0.07)" : "#E2E8F0",
+    surfaceTrack: isDark ? "#071526" : "#F1F5F9",
+    signalAccent: isDark ? "#38BDF8" : "#0055E5",
     textPrimary,
     textSub: isDark ? "rgba(248,250,252,0.60)" : "#4A6080",
     textMuted: isDark ? "rgba(248,250,252,0.38)" : "#64748B",

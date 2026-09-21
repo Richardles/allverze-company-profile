@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
 @import 'tailwindcss';
 
 html,
@@ -19,6 +20,7 @@ body {
 
 @theme {
   --font-sans: 'Plus Jakarta Sans', sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, serif;
   --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -26,6 +28,11 @@ body {
   font-family: 'Plus Jakarta Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Numeric voice: aligned digits for indices, steps, and lead references */
+.tnum {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Animations ──────────────────────────────────────────── */
@@ -37,11 +44,6 @@ body {
 @keyframes float-y {
   0%, 100% { transform: translateY(0px); }
   50%       { transform: translateY(-12px); }
-}
-
-@keyframes glow-pulse {
-  0%, 100% { opacity: 0.5; }
-  50%       { opacity: 1; }
 }
 
 /* ── Ticker contains a seamless duplicated loop ─────────── */
@@ -57,10 +59,6 @@ body {
 
 .orbital-float {
   animation: float-y 8s ease-in-out infinite;
-}
-
-.glow-pulse {
-  animation: glow-pulse 4s ease-in-out infinite;
 }
 
 /* ── Scrollbar ───────────────────────────────────────────── */
@@ -95,12 +93,59 @@ body {
 .fade-in-up-4 { animation-delay: 0.32s; }
 .fade-in-up-5 { animation-delay: 0.40s; }
 
+/* ── Hero scroll cue (bottom of the cinematic fold) ────────────────── */
+/* A quiet cyan drip on a 1px track that invites the fold below. Fades in
+   after the orbital formation settles (~5.0s), then drifts forever. The
+   global reduced-motion rule snaps both animations to their end states. */
+.hero-scroll-cue {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 30px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  animation: scroll-cue-in 0.8s var(--ease-premium, cubic-bezier(0.22, 1, 0.36, 1)) 5.0s forwards;
+}
+
+.hero-scroll-cue__track {
+  position: relative;
+  width: 1px;
+  height: 44px;
+  overflow: hidden;
+  background: linear-gradient(to bottom, rgba(56, 189, 248, 0.5), transparent);
+}
+
+.hero-scroll-cue__dot {
+  position: absolute;
+  top: 0;
+  left: -1px;
+  width: 3px;
+  height: 9px;
+  border-radius: 3px;
+  background: #38bdf8;
+  box-shadow: 0 0 8px 0 rgba(56, 189, 248, 0.55);
+  animation: scroll-cue-drift 2.2s var(--ease-premium, cubic-bezier(0.22, 1, 0.36, 1)) 5.5s infinite;
+}
+
+@keyframes scroll-cue-in {
+  to { opacity: 1; }
+}
+
+@keyframes scroll-cue-drift {
+  0% { transform: translateY(0); opacity: 0; }
+  18% { opacity: 1; }
+  100% { transform: translateY(56px); opacity: 0; }
+}
+
 /* ── Reduced motion ──────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
@@ -157,7 +202,8 @@ body {
 /* ?perf&grainoff debug mode: suppress the full-viewport blend + header blur to
    measure their frame-time contribution on a real phone (HUD gated, inert by default). */
 [data-perf-grain="0"] .grain,
-[data-perf-grain="0"] .grain-iconic {
+[data-perf-grain="0"] .grain-iconic,
+[data-perf-grain="0"] .logo-shimmer {
   opacity: 0 !important;
 }
 [data-perf-grain="0"] header {
@@ -263,6 +309,64 @@ body {
   mix-blend-mode: screen;
   filter: brightness(0) invert(1) blur(0.6px);
 }
+.hero-pod__mark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(1180px, 94vw);
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.07;
+  mix-blend-mode: screen;
+  filter: brightness(0) invert(1) blur(0.6px);
+}
+/* ── Hero logo shimmer ────────────────────────────────────────
+   A seeded field of cool white/cyan dots masked to the Allverze
+   silhouette (mask-image set inline from the asset URL). Each dot
+   breathes in place on its own period/delay; CSS opacity+scale only
+   (compositor), no rAF. Sits behind the orbital ring. */
+.logo-shimmer {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(1180px, 94vw);
+  aspect-ratio: 1280 / 628;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.55;
+  mix-blend-mode: screen;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+.logo-shimmer__dot {
+  position: absolute;
+  border-radius: 50%;
+  transform-origin: center;
+  background: radial-gradient(circle, #ffffff 0%, rgba(160, 230, 255, 0.65) 35%, rgba(56, 189, 248, 0) 72%);
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.55);
+  will-change: opacity, transform;
+  animation: logo-shimmer var(--s-dur, 4s) ease-in-out var(--s-delay, 0s) infinite alternate;
+}
+@keyframes logo-shimmer {
+  from { opacity: var(--s-min, 0.12); transform: scale(0.8); }
+  to   { opacity: var(--s-max, 1);    transform: scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo-shimmer__dot {
+    animation: none;
+    opacity: 0.4;
+    transform: none;
+  }
+}
+
 .orbital-stage {
   position: relative;
   /* Contain the ring's SVG churn: repaints/layout can't propagate to ancestors or
@@ -289,6 +393,18 @@ body {
 }
 .card-hover:hover::after {
   box-shadow: inset 0 0 0 1px rgba(0, 85, 229, 0.22);
+}
+
+/* Role-selector lit state (overrides card-hover ::after) */
+.module-pane.module-pane--lit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px rgba(56, 189, 248, 0.5);
+  animation: spotlight-pulse 1.6s var(--ease-premium);
+  pointer-events: none;
 }
 
 /* ── Gradient stat text (fallback-safe) ──────────────────── */

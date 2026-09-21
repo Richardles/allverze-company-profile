@@ -30,6 +30,14 @@ const faqs = [
   },
 ];
 
+const projectStages = [
+  "Concept — just an idea",
+  "In development",
+  "Live, needs improvement",
+  "Maintenance & support",
+  "Not sure yet",
+];
+
 export default function Contact() {
   const { isDark } = useTheme();
   const colors = useThemeColors();
@@ -49,6 +57,7 @@ export default function Contact() {
   } = useContactForm();
 
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [stage, setStage] = useState("");
 
   const { pageBg, cardBg, cardBorder, textPrimary, textSub, textMuted, inputBase } = colors;
 
@@ -393,6 +402,47 @@ export default function Contact() {
                     style={{ ...inputBase, resize: "none", opacity: sending ? 0.55 : 1, cursor: sending ? "not-allowed" : undefined }}
                     {...inputHandlers}
                   />
+                </div>
+
+                {/* Project stage (optional) */}
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="contact-stage" style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: textMuted }}>
+                    Where is your project today? <span style={{ opacity: 0.6 }}>(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      id="contact-stage"
+                      disabled={sending}
+                      value={stage}
+                      onChange={(e) => setStage(e.target.value)}
+                      style={{
+                        ...inputBase,
+                        appearance: "none",
+                        WebkitAppearance: "none",
+                        cursor: sending ? "not-allowed" : "pointer",
+                        opacity: sending ? 0.55 : 1,
+                        paddingRight: 40,
+                        color: stage ? undefined : textMuted,
+                      }}
+                      {...inputHandlers}
+                    >
+                      <option value="" disabled>
+                        Select a stage
+                      </option>
+                      {projectStages.map((s) => (
+                        <option key={s} value={s} style={{ background: isDark ? "#0B1D35" : "#FFFFFF", color: isDark ? "#F8FAFC" : "#0B1D35" }}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                    <svg
+                      aria-hidden="true"
+                      width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round"
+                      style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", color: isDark ? "#7AABFF" : "#0055E5", pointerEvents: "none" }}
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-2 mt-1">

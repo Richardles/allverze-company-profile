@@ -1,8 +1,10 @@
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../theme/ThemeContext";
 import { useThemeColors } from "../theme/useThemeColors";
 import { openContactForm, openServiceModule } from "../lib/contactNav";
 import { WHATSAPP_URL } from "../config";
+import ProcessFlow from "../components/ProcessFlow";
 
 const modules = [
   {
@@ -60,23 +62,69 @@ const modules = [
 ];
 
 const steps = [
-  { num: "01", label: "Discovery & Audit",       desc: "We map your current state — systems, gaps, risks, and opportunities — before a single line of code is written." },
-  { num: "02", label: "Solution Architecture",    desc: "We design the right solution, not the most expensive one. Every blueprint ties back to the outcome you want." },
-  { num: "03", label: "Execution & Hardening",    desc: "We build, test, and secure in visible stages — with demos along the way and staged, careful deploys." },
-  { num: "04", label: "Continuous Optimization",  desc: "After go-live we monitor, iterate, and improve — because Better Every Day doesn't stop at launch." },
+  { num: "01", title: "Discovery & Audit",       desc: "We map your current state — systems, gaps, risks, and opportunities — before a single line of code is written." },
+  { num: "02", title: "Solution Architecture",    desc: "We design the right solution, not the most expensive one. Every blueprint ties back to the outcome you want." },
+  { num: "03", title: "Execution & Hardening",    desc: "We build, test, and secure in visible stages — with demos along the way and staged, careful deploys." },
+  { num: "04", title: "Continuous Optimization",  desc: "After go-live we monitor, iterate, and improve — because Better Every Day doesn't stop at launch." },
+];
+
+const roleOptions: { label: string; to: number[] | null }[] = [
+  { label: "Starting something new",   to: [0, 1] },
+  { label: "Scaling what works",       to: [2, 3] },
+  { label: "Internal systems & integrations", to: [0] },
+  { label: "Platform at scale",        to: [2, 3] },
+  { label: "Long-term partner",        to: [0, 1, 2, 3] },
+  { label: "Not sure yet",             to: null },
 ];
 
 export default function Services() {
   const navigate = useNavigate();
   const { isDark } = useTheme();
   const colors = useThemeColors();
+  const [activeModule, setActiveModule] = useState(-1);
+  const [activeRole, setActiveRole] = useState<number | null>(null);
+  const [navStuck, setNavStuck] = useState(false);
+  const bannerRef = useRef<HTMLElement | null>(null);
 
-  const stepNumBg = isDark ? "rgba(0,85,229,0.14)" : "rgba(0,85,229,0.08)";
+  useEffect(() => {
+    const sections = modules
+      .map((_, i) => document.getElementById(`module-${i + 1}`))
+      .filter((el): el is HTMLElement => Boolean(el));
+    if (!sections.length) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const idx = sections.indexOf(entry.target as HTMLElement);
+            setActiveModule(idx);
+          }
+        }
+      },
+      { rootMargin: "0px 0px -62% 0px", threshold: 0 },
+    );
+    sections.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const banner = bannerRef.current;
+    if (!banner) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          setNavStuck(!entry.isIntersecting);
+        }
+      },
+      { threshold: 0 },
+    );
+    io.observe(banner);
+    return () => io.disconnect();
+  }, []);
 
   return (
     <main style={{ paddingTop: 72 }}>
       {/* ── HEADER BANNER ─────────────────────────────────────── */}
-      <section style={{ background: "#0B1D35", paddingTop: 88, paddingBottom: 88 }} className="px-6 lg:px-12 relative overflow-hidden">
+      <section ref={bannerRef} style={{ background: "#0B1D35", paddingTop: 88, paddingBottom: 88 }} className="px-6 lg:px-12 relative overflow-hidden">
         <div aria-hidden="true" className="crown-glow" />
         <div className="absolute inset-0 pointer-events-none dot-grid dot-grid--fade" style={{ opacity: 0.5 }} />
         <div className="max-w-7xl mx-auto relative">
@@ -100,31 +148,63 @@ export default function Services() {
           <p className="fade-in-up fade-in-up-2" style={{ marginTop: 20, fontSize: "1.0625rem", color: "rgba(248,250,252,0.58)", lineHeight: 1.75, maxWidth: 520 }}>
             Four areas of focus, one team behind them — scoped honestly, built in visible stages, and supported after launch.
           </p>
-          {/* Service quick-nav */}
-          <div className="flex flex-wrap gap-2 mt-8 fade-in-up fade-in-up-3">
-            {modules.map((m, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => openServiceModule(navigate, i)}
-                style={{
-                  fontSize: "0.75rem", fontWeight: 600,
-                  color: "rgba(248,250,252,0.55)",
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.10)",
-                  borderRadius: 6,
-                  padding: "5px 12px",
-                  cursor: "pointer",
-                  transition: "background 150ms, color 150ms, border-color 150ms",
-                }}
-                className="hover:bg-white/10 hover:text-white"
-              >
-                {m.tag}
-              </button>
-            ))}
-          </div>
         </div>
       </section>
+
+      {/* ── SERVICE QUICK-NAV (fixed overlay, appears after banner) ─ */}
+      <div
+        inert={!navStuck}
+        className="fixed left-0 right-0 z-40 px-6 lg:px-12"
+        style={{
+          top: 72,
+          background: isDark ? "rgba(6,14,26,0.82)" : "rgba(255,255,255,0.86)",
+          WebkitBackdropFilter: "blur(14px) saturate(1.3)",
+          backdropFilter: "blur(14px) saturate(1.3)",
+          borderTop: `1px solid ${isDark ? "rgba(0,85,229,0.14)" : "rgba(11,29,53,0.08)"}`,
+          borderBottom: `1px solid ${isDark ? "rgba(0,85,229,0.14)" : "rgba(11,29,53,0.08)"}`,
+          transform: navStuck ? "translateY(0)" : "translateY(-100%)",
+          opacity: navStuck ? 1 : 0,
+          pointerEvents: navStuck ? "auto" : "none",
+          transition: "transform 220ms var(--ease-premium), opacity 220ms ease, border-color 150ms ease",
+        }}
+      >
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center gap-2 py-3">
+          {modules.map((m, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => openServiceModule(navigate, i)}
+              className="tnum transition-all duration-150 active:scale-[0.97]"
+              style={
+                activeModule === i
+                  ? {
+                      fontSize: "0.75rem", fontWeight: 600,
+                      color: "#FFFFFF",
+                      background: "#0055E5",
+                      border: "1px solid #0055E5",
+                      borderRadius: 6,
+                      padding: "5px 12px",
+                      boxShadow: "0 2px 8px rgba(0,85,229,0.28)",
+                      whiteSpace: "nowrap",
+                    }
+                  : {
+                      fontSize: "0.75rem", fontWeight: 600,
+                      color: isDark ? "rgba(248,250,252,0.55)" : "#4A6080",
+                      background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
+                      border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"}`,
+                      borderRadius: 6,
+                      padding: "5px 12px",
+                      cursor: "pointer",
+                      transition: "background 150ms, color 150ms, border-color 150ms",
+                      whiteSpace: "nowrap",
+                    }
+              }
+            >
+              {m.tag}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* ── ALTERNATING MODULES ───────────────────────────────── */}
       {modules.map((mod, i) => {
@@ -139,6 +219,7 @@ export default function Services() {
         const panelBorder = mod.dark
           ? "1px solid rgba(56,189,248,0.14)"
           : `1px solid ${isDark ? "rgba(0,85,229,0.18)" : "rgba(0,85,229,0.12)"}`;
+        const lit = activeRole !== null && roleOptions[activeRole]?.to?.includes(i);
 
         return (
           <section
@@ -159,7 +240,7 @@ export default function Services() {
                 {/* Visual pane */}
                 <div className={i % 2 === 1 ? "lg:col-start-2" : ""}>
                   <div
-                    className="module-pane card-hover"
+                    className={`module-pane card-hover${lit ? " module-pane--lit" : ""}`}
                     style={{
                       borderRadius: 18,
                       overflow: "hidden",
@@ -260,6 +341,101 @@ export default function Services() {
         );
       })}
 
+      {/* ── WHO'S IT FOR (role selector) ─────────────────────── */}
+      <section
+        style={{
+          background: "#0B1D35",
+          borderTop: "1px solid rgba(0,85,229,0.12)",
+          paddingTop: 88,
+          paddingBottom: 88,
+        }}
+        className="px-6 lg:px-12 relative overflow-hidden"
+      >
+        <div aria-hidden="true" className="rim-glow-r" />
+        <div className="max-w-7xl mx-auto relative reveal">
+          <div className="max-w-2xl mb-12">
+            <p className="font-bold tracking-[0.14em] uppercase mb-3" style={{ fontSize: "0.6875rem", color: "#38BDF8" }}>
+              Who's It For
+            </p>
+            <h2 style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.4rem)", fontWeight: 700, color: "#F8FAFC", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+              Where are you today?
+            </h2>
+            <p style={{ marginTop: 10, fontSize: "0.9375rem", color: "rgba(248,250,252,0.55)", lineHeight: 1.7 }}>
+              Pick what fits — we'll light up the work that matches and hand you a place to start. Honest maps, not sales funnels.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2.5">
+            {roleOptions.map((opt, ri) => {
+              const active = activeRole === ri;
+              return (
+                <button
+                  key={opt.label}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => {
+                    if (opt.to === null) {
+                      setActiveRole(null);
+                      openContactForm(navigate);
+                      return;
+                    }
+                    setActiveRole(ri);
+                    openServiceModule(navigate, opt.to[0]);
+                  }}
+                  className="transition-all duration-150 active:scale-[0.97]"
+                  style={
+                    active
+                      ? {
+                          fontSize: "0.8125rem", fontWeight: 600,
+                          color: "#FFFFFF",
+                          background: "#0055E5",
+                          border: "1px solid #0055E5",
+                          borderRadius: 8,
+                          padding: "9px 16px",
+                          boxShadow: "0 2px 12px rgba(0,85,229,0.30)",
+                        }
+                      : {
+                          fontSize: "0.8125rem", fontWeight: 600,
+                          color: "rgba(248,250,252,0.75)",
+                          background: "rgba(255,255,255,0.06)",
+                          border: "1px solid rgba(255,255,255,0.12)",
+                          borderRadius: 8,
+                          padding: "9px 16px",
+                          cursor: "pointer",
+                          transition: "background 150ms, color 150ms, border-color 150ms",
+                        }
+                  }
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {activeRole !== null && (() => {
+            const targets = roleOptions[activeRole]?.to ?? [];
+            return (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-6">
+                <span style={{ fontSize: "0.8rem", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#38BDF8" }}>
+                  Pointing you at
+                </span>
+                <span style={{ fontSize: "0.875rem", color: "rgba(248,250,252,0.60)" }}>
+                  {targets.map((t) => modules[t].title).join(" · ")}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveRole(null)}
+                  className="text-sm underline underline-offset-2 transition-opacity hover:opacity-70"
+                  style={{ color: "rgba(248,250,252,0.45)" }}
+                >
+                  Clear
+                </button>
+              </div>
+            );
+          })()}
+        </div>
+      </section>
+
       {/* ── A TO Z WORKFLOW ───────────────────────────────────── */}
       <section
         style={{
@@ -283,39 +459,7 @@ export default function Services() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {steps.map((step, i) => (
-              <div
-                key={step.num}
-                className="card-hover flex flex-col gap-4"
-                style={{
-                  background: colors.cardBg,
-                  border: `1px solid ${colors.cardBorder}`,
-                  borderRadius: 14,
-                  padding: "28px 24px",
-                  boxShadow: isDark ? "0 1px 4px rgba(0,0,0,0.25)" : "0 1px 4px rgba(0,0,0,0.04)",
-                  position: "relative",
-                }}
-              >
-                {i < steps.length - 1 && (
-                  <div className="hidden lg:block absolute" style={{ top: 33, right: -18, width: 16, height: 16, zIndex: 2 }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path d="M9 18l6-6-6-6" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
-                )}
-                <div style={{ fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.06em", color: "#0055E5", background: stepNumBg, borderRadius: 6, padding: "4px 10px", alignSelf: "flex-start" }}>
-                  {step.num}
-                </div>
-                <h3 style={{ fontSize: "1rem", fontWeight: 700, color: colors.textPrimary, letterSpacing: "-0.01em" }}>
-                  {step.label}
-                </h3>
-                <p style={{ fontSize: "0.855rem", color: colors.textSub, lineHeight: 1.7 }}>
-                  {step.desc}
-                </p>
-              </div>
-            ))}
-          </div>
+          <ProcessFlow steps={steps} variant="grid" />
         </div>
       </section>
 

@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -14,6 +15,19 @@ interface OrbitalRingProps {
   className?: string;
   variant?: "tube" | "constellation";
   speed?: "majestic" | "lively";
+  /** One-shot full-screen "formation" intro (Home hero only): the ring's own
+   *  stars scatter across the whole viewport, drift in to their orbit slots
+   *  under a slow swirl, whip into a fast spin, then decelerate onto the
+   *  settled rings (bands/sun/comet emerging as it relaxes). Then it runs
+   *  forever. Reduced-motion renders the settled rings instantly. */
+  birth?: boolean;
+  /** The hero element the scatter field spans (measured once). Defaults to
+   *  the wrapper itself (ring-size scattering) when omitted. */
+  scatterFieldRef?: React.RefObject<HTMLElement | null>;
+  /** Optional guide the birth scatter should hug (e.g. the Allverze silhouette
+   *  behind the hero ring). When present it takes precedence over the scatter
+   *  field and the field is inflated by SCATTER_SPILL for a soft spill. */
+  scatterGuideRef?: React.RefObject<HTMLElement | null>;
 }
 
 interface Layer {
@@ -150,6 +164,81 @@ const DRAW_DUR_MIN = 0.18;
 const DRAW_DUR_MAX = 0.48;
 const easeOutQuart = (u: number) => 1 - Math.pow(1 - u, 4);
 const easeInOutCubic = (u: number) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
+// Premium settle: a gentle ease-out-back overshoot for the scatter→orbit drift.
+// Overshoot ~1.08 read as "airy" without an elastic howl; clamped to 1 so stars
+// never overshoot past their slot on the visual edge (they ride the common ease).
+const swoopEase = (u: number) => Math.min(1, 1 + 2.70158 * Math.pow(u - 1, 3) + 1.70158 * Math.pow(u - 1, 2));
+
+/* ── "Star-birth" formation intro (Home hero only) ─────────────────────
+   One-shot, once per page load (module flag latched on first painted frame
+   so StrictMode double-mounts / SPA back-nav never replay it). The ring's
+   own stars scatter across the whole viewport, drift into their orbit slots,
+   then each star whips along its own 3D orbital loop at its own speed while
+   the plane dives nearly edge-on, then crystallises back into the final
+   (already-interactive) rings — then a constellation is born at centre.
+   Reduced-motion never enters. */
+let ringBirthPlayed = false;
+let constellationAutoDrawn = false; // one-shot latch for the centre "birth" figure
+const FORM_SCATTER_INSET = 14; // px clear of the hero edges when scattering (wide, near-full-bleed)
+const SCATTER_SPILL = 0.1; // soft spill: scatter rect inflates 10% (5% per side) beyond the guide band
+const FORM_SCATTER_SPREAD = 1.3; // seconds across which stars first appear (stagger)
+const FORM_APPEAR_DUR = 0.32; // per-star fade-in as it "shows up" (one by one)
+const FORM_SCATTER_HOLD = 0.5; // s holding the full scattered tableau before the drift-in begins
+const FORM_CONVERGE_DUR = 1.0; // drift from scatter point to orbit slot (done before storm)
+const FORM_WHIP_START = 2.8; // the "like crazy" per-star 3D storm begins
+const FORM_WHIP_TOTAL = 1.2; // storm burst (smoothstep envelope: gentle start/stop)
+const FORM_WHIP_END = FORM_WHIP_START + FORM_WHIP_TOTAL; // 4.0
+const FORM_RELAX = 1.5; // crystallise: plane unfolds + phase unwinds into final rings
+const FORM_END = FORM_WHIP_END + FORM_RELAX; // 5.5 — envelope no-ops forever
+// Per-star 3D storm parameters.
+const FORM_MULT_PEAK = 15; // max orbit-acceleration multiplier at storm peak
+const FORM_K_MIN = 0.3; // per-star speed floor: rate_i = 1 + 14·(K_MIN+(1−K_MIN)·v_i)
+const FORM_STORM_SLIP = 0.02; // per-star time offset ±(seconds) — organic stagger into storm
+const FORM_E_BOOST = 0.5; // eccentricity surge multiplier: e_i = s.e + BOOST·v_i·env
+const FORM_TILT_PEAK = 0.16; // plane squash at storm peak (~81°, nearly edge-on)
+const FORM_TILT_JITTER = 0.35; // per-star plane jitter (±17.5% of tilt)
+const FORM_DEPTH_AMP = 0.06; // per-star scale/brightness amplitude (closer = bigger/brighter)
+const AUTO_DRAW_DELAY = 0.35; // calm breath after FORM_END before centre constellation
+// Scenery emerges as the storm relaxes into the final rings.
+const FORM_BANDS_0 = FORM_WHIP_END + 0.05; // ~3.45 halo/guide
+const FORM_BANDS_STEP = 0.18;
+const FORM_SCENERY_DUR = 0.75;
+const FORM_SUN = FORM_BANDS_0 + 0.15; // ~3.6
+const FORM_COMET = FORM_BANDS_0 + 0.3; // ~3.75
+
+/* ── Storm envelope library ───────────────────────────────────────────
+   smoothstep(u)  = 3u²−2u³, zero slope at 0 and 1.
+   stormG(u)      = 16u²(1−u)², symmetric pulse [0→1→0], zero slope ends,
+                     peak 1 at u=0.5.
+   stormGInt(u)   = 16(u³/3 − u⁴/2 + u⁵/5), integral of stormG (0→0.5333 at 1).
+   pFoldGlobal(t) — two-phase plane tilt:
+     · storm  [WHIP_START..WHIP_END]: 1 → FORM_TILT_PEAK via smoothstep (diving).
+     · relax  [WHIP_END..END]: FORM_TILT_PEAK → PLANE_SQUASH via easeInOut (unfolding).
+   Zero slopes at every seam — fully velocity-continuous. */
+const smoothstep = (u: number) => u * u * (3 - 2 * u);
+const stormG = (u: number) => {
+  const v = 1 - u;
+  return 16 * u * u * v * v;
+};
+const STORM_INT = 16 / 30; // stormGInt(1) = exact closed-form normalisation
+const stormGInt = (u: number) => 16 * (u * u * u / 3 - u * u * u * u / 2 + u * u * u * u * u / 5);
+const pFoldGlobal = (t: number): number => {
+  if (t >= FORM_WHIP_END) {
+    const u = Math.min(1, Math.max(0, (t - FORM_WHIP_END) / FORM_RELAX));
+    return FORM_TILT_PEAK + (PLANE_SQUASH - FORM_TILT_PEAK) * easeInOutCubic(u);
+  }
+  const u = Math.min(1, Math.max(0, (t - FORM_WHIP_START) / FORM_WHIP_TOTAL));
+  return FORM_TILT_PEAK + (1 - FORM_TILT_PEAK) * (1 - smoothstep(u));
+};
+// Zero-alloc temp orbit for the formation frame loop (per-star p/e override).
+// A stable object identity keeps the Kepler-seed cache warm during the storm.
+const FORM_ORB: { a: number; e: number; omega: number; theta: number; p: number } = {
+  a: 0,
+  e: 0,
+  omega: 0,
+  theta: 0,
+  p: 1,
+};
 
 // Cascading draw rhythm: inter-edge start deltas shrink as the figure completes
 // (arpeggio momentum — the last strokes lock in fastest).
@@ -182,7 +271,14 @@ const COIL_DIP = 0.9; // star opacity held to this multiple during the window
 // OIII core, and a dark star hollow (Fish's-Mouth cavity). See -nebula-env /
 // -nebula-core filter defs + the Element Map vocabulary.
 const NEBULA_BREATH = 0.3; // settled halo shimmer (all layers): x (1 + NEBULA_BREATH * sin)
-const NEBULA_BREATH_PERIOD = 3.0; // s per full neon breath cycle
+// One breath, one voice: every ambient layer (constellation glow lines, nebula
+// wash, background halo, scene-wide macro swell) breathes on THE SAME 4s clock.
+// The phase offset is chosen so the seamless full-ring pulse reads as one slow
+// "inhale / exhale" — nothing fights its neighbours.
+const BREATH_PERIOD = 4.0; // s per full ambient breath cycle (was 3.0; ~2x the 8s .orbital-float = harmonic)
+const BREATH_PHASE = 0; // s — phase anchor shared by every ambient layer
+const ambientBreath = (t: number) =>
+  1 + NEBULA_BREATH * Math.sin((2 * Math.PI * (t + BREATH_PHASE)) / BREATH_PERIOD);
 const NEBULA_TURB_FREQ = 0.02; // envelope cloud baseFrequency center, primary axis
 const NEBULA_TURB_RATIO = 1.6; // envelope secondary axis = FREQ * RATIO (soft horizontal drift)
 const NEBULA_TURB_AMP = 0.001; // slow sine amplitude around the center (10s cycle)
@@ -216,6 +312,15 @@ const TIP_PROX_RADIUS = 0.5; // nib proximity falloff radius as fraction of size
 const TIP_SW = 2.4; // pen-tip stroke width (vs LINE_REST_W crisp edge)
 const NEBULA_OP = 0.055; // settled nebula halo opacity
 const LINE_REST_W = 1.25; // crisp constellation edge resting width (snap pops to ~2.25px)
+// Premium star life — Depth, Perihelion & the macro sky breath (one organism).
+// All three are pure SIDECARS on writes that already happen every frame (star
+// opacity, scene wrapper): zero extra DOM writes, zero new filters.
+const DEPTH_AIR = 0.1; // airmass depth shading: near-side stars read ±10% brighter, far side dimmer
+const PERIHELION_PEAK = 0.08; // each star gently sparks as its own orbit reaches perihelion (once per ~14–46s)
+const SCENE_BREATH_AMP = 0.005; // whole scene inhales/exhales ±0.5% scale on the shared ambientBreath clock
+// Background halo rides the same breath: 0.5 ± (breath swing) → 0.5±0.15·... kept
+// equal to the legacy .glow-pulse range (0.5→1) so the visual is unchanged.
+const bgGlowBreath = (breath: number) => 0.5 + (0.5 * (breath - 1)) / NEBULA_BREATH;
 // Anchor echo flare: 3-dot secondary sparkle echoing the roll at the anchor star.
 const ECHO_OP = 0.6; // echo dot peak opacity
 const ECHO_DECAY = 0.88; // per-frame decay of the echo burst
@@ -274,12 +379,24 @@ const BLOWOUT_LAG = 1 - Math.pow(1 - BLOWOUT_BETA, 1.5);
 
 /* Adaptive ε-gated writes (zero-visual): geometry is always solved at full rate,
    but DOM writes are skipped until an element has perceptibly moved. Sub-ε motion
-   is invisible — stars drift ~0.5px/frame at majestic (writes land ~30Hz instead
-   of 60Hz), and the comet tail steps ≪ its halo-blur σ (≈5.7px at size 480). The
-   biggest win is WebKit (iPhone), which ignores SVG will-change: far fewer
-   main-thread re-rasters per second. */
-const STAR_EPS = 0.8; // px — star re-write threshold (≈2× the ~0.5px/frame drift)
+   is invisible — stars drift ~0.5px/frame at majestic (STAR_EPS 0.5 ⇒ steady
+   writes land ~60Hz for premium smoothness; we still gate true sub-pixel motion
+   so WebKit/iOS SVG re-rasters stay low), and the comet tail steps ≪ its
+   halo-blur σ (≈5.7px at size 480). The biggest win is WebKit (iPhone), which
+   ignores SVG will-change: far fewer main-thread re-rasters per second. */
+const STAR_EPS = 0.5; // px — star re-write threshold (≈1× the ~0.5px/frame majestic drift ⇒ steady writes land ~60Hz)
 const STAR_EPS_SQ = STAR_EPS * STAR_EPS;
+// Settled "orbital breathing": a gentle mean-anomaly sway added to every star's
+// clock, so each star eases into a slightly faster/slower glide once per breath
+// cycle (Velocity-continuous sinusoid — no snap at FORM_END because both the
+// formation and steady paths share the same term). Phase comes from the star's
+// own M0, so neighbours never lock-step. This makes the eternal orbit feel
+// alive — the ring "breathes" even at rest, premium-unhurried.
+const ORB_BREATH_AMP = 0.06; // rad — max mean-anomaly sway (~10px glide at ring mid-radius, 480)
+const ORB_BREATH_PERIOD = 7.0; // s per full breath (≠ BREATH_PERIOD 4.0 ⇒ no lockstep with the scene scale-breath)
+const ORB_BREATH_RAMP = 2.0; // s — breath eases from 0 at mount so the first loop frame never pops from the JSX snapshot
+const orbBreath = (t: number, m0: number) =>
+  ORB_BREATH_AMP * Math.sin((2 * Math.PI * t) / ORB_BREATH_PERIOD + m0) * Math.min(1, t / ORB_BREATH_RAMP);
 const COMET_TAIL_EPS = 1.5; // px — ~¼ of the halo-blur σ: steps wash out in the blur
 const COMET_TAIL_EPS_SQ = COMET_TAIL_EPS * COMET_TAIL_EPS;
 const COMET_TAIL_SAMPLES = 9; // [x,y] pairs cached for the tail's adaptive write gate
@@ -359,6 +476,10 @@ const COMET_HEAD_BUF: [number, number] = [0, 0];
 const COMET_ION_END_BUF: [number, number] = [0, 0];
 const COMET_SODIUM_END_BUF: [number, number] = [0, 0];
 const COMET_MOTES_BUF: [number, number][] = Array.from({ length: COMET_MOTES_K.length }, () => [0, 0]);
+/* Per-frame scratch for the 60Hz mote solve: grain orbit point + its nucleus-epoch
+   emit point, written fresh each frame (identical math to cometGeometry, fresher data). */
+const COMET_MOTE_ORB_BUF: [number, number][] = Array.from({ length: COMET_MOTES_K.length }, () => [0, 0]);
+const COMET_MOTE_EMIT_BUF: [number, number][] = Array.from({ length: COMET_MOTES_K.length }, () => [0, 0]);
 const COMET_GEO: CometGeo = {
   head: COMET_HEAD_BUF,
   lanes: COMET_LANE_BUF,
@@ -632,6 +753,9 @@ export default function OrbitalRing({
   className = "",
   variant = "tube",
   speed = "majestic",
+  birth = false,
+  scatterFieldRef,
+  scatterGuideRef,
 }: OrbitalRingProps) {
   const reduced = usePrefersReducedMotion();
   const [forcePlay, setForcePlay] = useState(false);
@@ -644,6 +768,27 @@ export default function OrbitalRing({
   const ry = size * 0.157;
   const reactRadius = size * 0.24;
   const interactive = tuning.starNodes;
+
+  /* Star-birth gate: decided on mount, latched to the first painted frame
+     (StrictMode double-mounts cancel their rAF before it fires, so the visible
+     instance always plays; SPA back-nav later never replays). */
+  const [doBirth] = useState(() => {
+    if (!birth || reducedEff || !interactive || ringBirthPlayed) return false;
+    return true;
+  });
+  const birthRef = useRef(doBirth);
+  // Late-bound hook for the centre "star-birth" figure (see module doc) — the
+  // frame loop calls this, the real implementation is wired up below.
+  const autoDrawRef = useRef<() => void>(() => {});
+  // Armed at the formation settle (FORM_END), fired after a calm beat.
+  const autoDrawPendingRef = useRef(false);
+  useEffect(() => {
+    if (!doBirth) return;
+    const rafId = requestAnimationFrame(() => {
+      ringBirthPlayed = true;
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [doBirth]);
 
   const stars = useMemo<Star[]>(() => {
     const list: Star[] = [];
@@ -719,6 +864,19 @@ export default function OrbitalRing({
     return list;
   }, [size, tuning.starNodes, cx, cy, speed]);
 
+  // Per-star appear timing for the formation intro & the scatter concurrency —
+  // derived from existing deterministic fields (M0 + index) so it consumes NO
+  // extra rand() calls and can't reshape the settled star field.
+  const formStagger = useMemo<number[] | null>(() => {
+    if (!doBirth) return null;
+    const out = new Array<number>(stars.length);
+    for (let i = 0; i < stars.length; i++) {
+      const s = stars[i];
+      out[i] = ((s.M0 / (Math.PI * 2) + i * 0.1729) % 1) * FORM_SCATTER_SPREAD;
+    }
+    return out;
+  }, [doBirth, stars]);
+
   const comet = useMemo(
     () => {
       if (!tuning.starNodes) return null;
@@ -741,6 +899,45 @@ export default function OrbitalRing({
   }, [comet, cx, cy, size]);
 
   const wrapRef = useRef<HTMLDivElement>(null);
+  /* Full-screen formation scatter: measured once on mount — every star gets a
+     random point across the scatter field (guide → hero, or the wrapper if
+     omitted), expressed in viewBox units so off-square points render with
+     overflow. When a guide (the Allverze silhouette) is supplied, the rect is
+     inflated by SCATTER_SPILL per side for a soft spill beyond the logo. */
+  const formationRef = useRef<{ scatter: Float64Array } | null>(null);
+  useLayoutEffect(() => {
+    if (!doBirth) return;
+    const field = scatterGuideRef?.current ?? scatterFieldRef?.current ?? wrapRef.current;
+    const w = wrapRef.current;
+    if (!field || !w) return;
+    const fr = field.getBoundingClientRect();
+    const wb = w.getBoundingClientRect();
+    if (fr.width <= 2 || fr.height <= 2 || wb.width <= 2) return;
+    const unit = wb.width / size;
+    const guide = Boolean(scatterGuideRef?.current);
+    // Soft spill: inflate the guide rect 5% per side, keep the field hero-scaled so
+    // the logo band dominates while stars may softly stray past its slim edges.
+    const inset = guide ? Math.max(2, Math.min(FORM_SCATTER_INSET, fr.height * 0.04)) : FORM_SCATTER_INSET;
+    const spill = guide ? SCATTER_SPILL / 2 : 0;
+    const sx = fr.left - fr.width * spill + inset;
+    const sy = fr.top - fr.height * spill + inset;
+    const sw = Math.max(1, fr.width * (1 + SCATTER_SPILL) - inset * 2);
+    const sh = Math.max(1, fr.height * (1 + SCATTER_SPILL) - inset * 2);
+    const rand = mulberry32(size * 104729 + 7);
+    const scatter = new Float64Array(stars.length * 2);
+    for (let i = 0; i < stars.length; i++) {
+      scatter[i * 2] = (sx + rand() * sw - wb.left) / unit;
+      scatter[i * 2 + 1] = (sy + rand() * sh - wb.top) / unit;
+    }
+    formationRef.current = { scatter };
+  }, [doBirth, size, stars.length, scatterFieldRef, scatterGuideRef]);
+  /* Birth-intro fade wrappers: band trio + guide ring + sun + comet emerge on
+     the staggered clock, then their opacity is left at 1 forever. */
+  const bandBirthRefs = useRef<(SVGGElement | null)[]>([]);
+  const guideBirthRef = useRef<SVGCircleElement | null>(null);
+  const bgGlowRef = useRef<SVGCircleElement | null>(null);
+  const sunBirthRef = useRef<SVGGElement | null>(null);
+  const cometBirthRef = useRef<SVGGElement | null>(null);
   const starRefs = useRef<(SVGGElement | null)[]>([]);
   const lineRefs = useRef<(SVGLineElement | null)[]>([]);
   const headRef = useRef<SVGGElement | null>(null);
@@ -940,7 +1137,7 @@ export default function OrbitalRing({
     const tipEls = constellationTipRefs.current;
     const glowEls = constellationGlowRefs.current;
     const igniteT = igniteTargetRef.current;
-    const breath = 1 + NEBULA_BREATH * Math.sin((2 * Math.PI * t) / NEBULA_BREATH_PERIOD);
+    const breath = ambientBreath(t);
     for (let k = 0; k < MAX_CONSTELLATION_EDGES; k++) {
       const el = constellationLineRefs.current[k];
       if (!el) continue;
@@ -1099,7 +1296,7 @@ export default function OrbitalRing({
           const ap = pos[c.anchor];
           const hcx = ap ? wcx + (ap[0] - wcx) * ANCHOR_PULL : wcx;
           const hcy = ap ? wcy + (ap[1] - wcy) * ANCHOR_PULL : wcy;
-          const wBreath = 1 + NEBULA_BREATH * Math.sin((2 * Math.PI * t) / NEBULA_BREATH_PERIOD);
+          const wBreath = ambientBreath(t);
           const settled = drawP >= 1;
           const wProgress = settled ? 1 : Math.min(1, drawP * 2);
           const drawingScale = settled ? 1 : WASH_DRAWING_RATIO;
@@ -1231,34 +1428,119 @@ export default function OrbitalRing({
       }
       const t = (now - t0 - pausedMs) / 1000;
       timeRef.current = t;
+      // One breath, one voice: the background halo and the whole ring share the
+      // SAME ambientBreath clock as the constellation glow + nebula wash. The
+      // halo breathes 0.5↔1 (the original .glow-pulse range), and the entire
+      // scene swells ±SCENE_BREATH_AMP on the compositor-promoted wrapper so the
+      // "sky inhales" costs exactly one style write per frame. Reduced-motion
+      // skips this loop entirely (static scene, halo at JSX default 0.5).
+      {
+        const breath = ambientBreath(t);
+        const halo = bgGlowRef.current;
+        if (halo) setAttr(halo, "opacity", bgGlowBreath(breath).toFixed(3));
+        const wrap = wrapRef.current;
+        if (wrap) {
+          wrap.style.transform = `scale(${(1 + SCENE_BREATH_AMP * ((breath - 1) / NEBULA_BREATH)).toFixed(4)})`;
+        }
+      }
+      // Birth envelope no-ops forever after its window (all emerges = 1), so the
+      // hot path drops the branch entirely and writes revert to the plain scene.
+      if (birthRef.current && t >= FORM_END) {
+        birthRef.current = false;
+        // "Star-birth" figure: arm the free-floating centre draw, fired after a
+        // calm breath (AUTO_DRAW_DELAY) so the settle is felt, then the figure
+        // is born. Routed through a ref (see autoDrawRef) — no use-before-define.
+        autoDrawPendingRef.current = true;
+      }
+      if (autoDrawPendingRef.current && t >= FORM_END + AUTO_DRAW_DELAY) {
+        autoDrawPendingRef.current = false;
+        autoDrawRef.current();
+      }
       const M = comet.M0 + (2 * Math.PI * t) / comet.P;
 
-      // Sub-step: recompute AND rewrite the comet only every COMET_SUB_STEP
-      // frames. At a ~29s orbital period the single-frame lag is sub-pixel, but
-      // it halves the ~210 Kepler dust solves and the lane-string building.
-      if (cometSub++ % COMET_SUB_STEP === 0) {
-        const geo = cometGeometry(comet, M, cx, cy, size, (2 * Math.PI * t) / ION_KINK_PERIOD);
-        const boost = Math.min(1.35, Math.max(0.6, 0.55 + geo.rRatio * 0.45));
-
-        // Head write gate: same ε principle as the stars — the head is a blurred
-        // ~0.05·size coma, so sub-ε translate+opacity steps are invisible.
+      // ── 60Hz comet head + motes ─────────────────────────────────────────
+      // The head (crisp nucleus) and the 5 motes (fast dust specks) solve AND
+      // write every frame at full cadence. They're small/near elements where a
+      // 20Hz step is visible, unlike the huge blurred tail. The tail keeps its
+      // COMET_SUB_STEP gate below. Math is identical to the sub-stepped
+      // cometGeometry — same Kepler seeds, same ε-gates — just fresher.
+      orbitScreenPosInto(comet, M, cx, cy, COMET_HEAD_BUF);
+      const ehSeed = keplerSeedCache.get(comet as object);
+      const ehE = keplerSolve(M, comet.e, ehSeed);
+      const ehR = Math.max(comet.a * (1 - comet.e * Math.cos(ehE)), 0.0001);
+      const ehRR = (comet.a / ehR) * (comet.a / ehR);
+      const ehx = COMET_HEAD_BUF[0];
+      const ehy = COMET_HEAD_BUF[1];
+      {
         let headCache = cometHeadLastRef.current;
         if (!headCache) {
           headCache = new Float64Array(2);
           cometHeadLastRef.current = headCache;
         }
-        const hx = geo.head[0];
-        const hy = geo.head[1];
-        const hDx = hx - headCache[0];
-        const hDy = hy - headCache[1];
+        const hDx = ehx - headCache[0];
+        const hDy = ehy - headCache[1];
         if (hDx * hDx + hDy * hDy >= COMET_HEAD_EPS_SQ) {
           if (headRef.current) {
-            headRef.current.style.transform = `translate(${hx.toFixed(2)}px,${hy.toFixed(2)}px)`;
-            setAttr(headRef.current, "opacity", cometHeadOpacity(geo.rRatio).toFixed(3));
+            headRef.current.style.transform = `translate(${ehx.toFixed(2)}px,${ehy.toFixed(2)}px)`;
+            setAttr(headRef.current, "opacity", cometHeadOpacity(ehRR).toFixed(3));
           }
-          headCache[0] = hx;
-          headCache[1] = hy;
+          headCache[0] = ehx;
+          headCache[1] = ehy;
         }
+      }
+      {
+        // Motes solve at full rate too: each motes[i] is a cheap per-frame pair
+        // (grain point on grainOrbits[2] + its nucleus-epoch emit), re-using the
+        // SAME jitter formula as cometGeometry so frames are pixel-identical,
+        // just fresher.
+        const grainOrbits = grainOrbitsFor(comet);
+        const g2 = grainOrbits[2];
+        const beta2 = BETA_LADDER[2];
+        let moteCache = cometMoteLastRef.current;
+        if (!moteCache || moteCache.length !== COMET_MOTES_K.length * 2) {
+          moteCache = new Float64Array(COMET_MOTES_K.length * 2);
+          cometMoteLastRef.current = moteCache;
+        }
+        for (let i = 0; i < COMET_MOTES_K.length; i++) {
+          const k = COMET_MOTES_K[i];
+          const p = COMET_MOTE_ORB_BUF[i];
+          const e = COMET_MOTE_EMIT_BUF[i];
+          orbitScreenPosInto(g2, M - k * EPOCH_LAG * LAG_BY_BETA[2], cx, cy, p);
+          orbitScreenPosInto(comet, M - k * EPOCH_LAG, cx, cy, e);
+          const mx =
+            ehx +
+            p[0] -
+            e[0] +
+            Math.sin(k * 12.9898 + 2 * 78.233) * EJECT_JITTER * size * Math.max(beta2, 0.03) +
+            Math.sin(k * 12.9898) * 0.02 * size;
+          const my =
+            ehy +
+            p[1] -
+            e[1] +
+            Math.cos(k * 39.7101 + 2 * 27.439) * EJECT_JITTER * size * Math.max(beta2, 0.03) +
+            Math.cos(k * 78.233) * 0.02 * size;
+          const g = moteRefs.current[i];
+          if (!g) continue;
+          const mDx = mx - moteCache[i * 2];
+          const mDy = my - moteCache[i * 2 + 1];
+          if (mDx * mDx + mDy * mDy >= COMET_MOTE_EPS_SQ) {
+            g.style.transform = `translate(${mx.toFixed(2)}px,${my.toFixed(2)}px)`;
+            moteCache[i * 2] = mx;
+            moteCache[i * 2 + 1] = my;
+          }
+        }
+      }
+
+      // Sub-step: recompute AND rewrite the comet tail only every COMET_SUB_STEP
+      // frames. At a ~29s orbital period the single-frame lag is sub-pixel, but
+      // it halves the ~210 Kepler dust solves and the lane-string building.
+      if (cometSub++ % COMET_SUB_STEP === 0) {
+        const geo = cometGeometry(comet, M, cx, cy, size, (2 * Math.PI * t) / ION_KINK_PERIOD);
+        const boost = Math.min(1.35, Math.max(0.6, 0.55 + geo.rRatio * 0.45));
+        // Tail anchors ride the 60Hz head (fresher than geo.head this sub-step).
+        // The dust geometry itself is solved identically below.
+        const hx = ehx;
+        const hy = ehy;
 
         // Adaptive ε-gate for the blurred tail: geometry is solved at full rate
         // above, but these 12 filtered/gradient tail writes only fire when a
@@ -1332,25 +1614,6 @@ export default function OrbitalRing({
           }
           tailSave(geo, tail);
         }
-
-        // Mote write gate: per-mote ε, same principle as head/stars. Tiny crisp
-        // dust dots only re-write once they have drifted ~0.35px.
-        let moteCache = cometMoteLastRef.current;
-        if (!moteCache || moteCache.length !== geo.motes.length * 2) {
-          moteCache = new Float64Array(geo.motes.length * 2);
-          cometMoteLastRef.current = moteCache;
-        }
-        geo.motes.forEach(([x, y], i) => {
-          const g = moteRefs.current[i];
-          if (!g) return;
-          const mDx = x - moteCache[i * 2];
-          const mDy = y - moteCache[i * 2 + 1];
-          if (mDx * mDx + mDy * mDy >= COMET_MOTE_EPS_SQ) {
-            g.style.transform = `translate(${x.toFixed(2)}px,${y.toFixed(2)}px)`;
-            moteCache[i * 2] = x;
-            moteCache[i * 2 + 1] = y;
-          }
-        });
       }
 
       const ptr = pointerRef.current;
@@ -1372,35 +1635,111 @@ export default function OrbitalRing({
         starLast.fill(-1e9); // sentinel forces the first frame to write every star
         starLastRef.current = starLast;
       }
+      // Formation envelopes, computed once per frame. The global storm pulse
+      // stormG(u) drives everything and is exactly 0 before the storm and from
+      // FORM_WHIP_END on — outside the storm the settled ring is pixel-identical.
+      const uStorm = Math.min(1, Math.max(0, (t - FORM_WHIP_START) / FORM_WHIP_TOTAL));
+      const envStorm = stormG(uStorm);
+      const plane = pFoldGlobal(t);
+      // Relax envelope [WHIP_END..END]: 0 during the storm, 1 exactly at FORM_END.
+      // Shared by the phase unwind, the per-star plane unfold, and the premium
+      // opacity ramp-in — so every seam value meets the steady state exactly.
+      const relaxE = Math.min(1, Math.max(0, (t - FORM_WHIP_END) / FORM_RELAX));
+      const relaxDid = easeInOutCubic(relaxE);
       for (let i = 0; i < stars.length; i++) {
         const s = stars[i];
         const t2 = s.M0 + s.w * t;
-        orbitScreenPosInto(s, t2, cx, cy, loopPos[i]);
+        // Orbital breathing: a slow ±AMP mean-anomaly sway (vel-continuous), so
+        // stars ease faster/slower in a gentle 7s cycle instead of a metronome.
+        // t2 (pure Kepler) still drives the peri-sparkle so sparkle timing stays
+        // believable; every position solve uses t2 + breath.
+        const breath = orbBreath(t, s.M0);
+        orbitScreenPosInto(s, t2 + breath, cx, cy, loopPos[i]);
         const x = loopPos[i][0];
         const y = loopPos[i][1];
         const g = starRefs.current[i];
         if (g) {
-          const lx = starLast[i * 2];
-          const ly = starLast[i * 2 + 1];
-          const dx = x - lx;
-          const dy = y - ly;
-          if (dx * dx + dy * dy >= STAR_EPS_SQ) {
-            g.style.transform = `translate(${x.toFixed(2)}px,${y.toFixed(2)}px)`;
-            starLast[i * 2] = x;
-            starLast[i * 2 + 1] = y;
+          if (birthRef.current) {
+            // ── Formation path (one-shot 3D storm) ────────────────────
+            // Each star appears (0.32s) then drifts from its scatter point to
+            // its own orbit slot while that slot races along the star's OWN
+            // ellipse at its own speed (shear ×5–15), the projectile surges:
+            // an eccentricity "aphelion" loop + the whole plane diving nearly
+            // edge-on then unfolding. Phase deviation (dev) accumulated by the
+            // shear is unwound to exactly zero across the relax, so every star
+            // lands on its eternal orbit at FORM_END (no snap).
+            const form = formationRef.current;
+            const stag = formStagger?.[i] ?? 0;
+            // Stars hold the full scattered tableau for FORM_SCATTER_HOLD, then
+            // swoop into their slots with a premium airy overshoot (clamped).
+            const c = swoopEase(Math.min(1, Math.max(0, (t - stag - FORM_SCATTER_HOLD) / FORM_CONVERGE_DUR)));
+            const appear = Math.min(1, Math.max(0, (t - stag) / FORM_APPEAR_DUR));
+            // Stable per-star pseudo-rand derived from M0 + index (no RNG draws).
+            const vi = (s.M0 / (2 * Math.PI) + i * 0.6180339887) % 1;
+            const slip = (vi - 0.5) * 2 * FORM_STORM_SLIP;
+            const u = Math.min(1, Math.max(0, (t - FORM_WHIP_START - slip) / FORM_WHIP_TOTAL));
+            const env = stormG(u);
+            const kShape = FORM_K_MIN + (1 - FORM_K_MIN) * vi;
+            const dev = s.w * (FORM_MULT_PEAK - 1) * kShape * FORM_WHIP_TOTAL * stormGInt(u);
+            const extra = t < FORM_WHIP_END
+              ? dev
+              : s.w * (FORM_MULT_PEAK - 1) * kShape * FORM_WHIP_TOTAL * STORM_INT *
+                (1 - relaxDid);
+            FORM_ORB.a = s.a;
+            FORM_ORB.e = s.e + FORM_E_BOOST * vi * env;
+            FORM_ORB.omega = s.omega;
+            FORM_ORB.theta = s.theta;
+            // Plane: the whole ring shares the storm dive, then each star unfolds
+            // to ITS OWN orbit plane across the relax (main stars land on
+            // PLANE_SQUASH exactly as before; guide p=1 and dust p=0.6–0.95 land
+            // on their true planes) — zero-slope at both ends, no y-pop at FORM_END.
+            FORM_ORB.p = t < FORM_WHIP_END
+              ? plane * (1 + FORM_TILT_JITTER * (vi - 0.5) * envStorm)
+              : FORM_TILT_PEAK + (s.p - FORM_TILT_PEAK) * relaxDid;
+            orbitScreenPosInto(FORM_ORB, s.M0 + s.w * t + extra + breath, cx, cy, loopPos[i]);
+            const scatX = form ? form.scatter[i * 2] : loopPos[i][0];
+            const scatY = form ? form.scatter[i * 2 + 1] : loopPos[i][1];
+            const px = scatX + (loopPos[i][0] - scatX) * c;
+            const py = scatY + (loopPos[i][1] - scatY) * c;
+            // 3D fly-by depth: scale + brightness pushed by the storm pulse only.
+            const zDepth = FORM_DEPTH_AMP * envStorm * Math.sin(s.M0 + s.w * t + extra + s.omega);
+            const zScale = 1 + zDepth;
+            g.style.transform = `translate(${px.toFixed(2)}px,${py.toFixed(2)}px) scale(${zScale.toFixed(3)})`;
+            // Premium star life ramps in across the relax (prem → premiumLife),
+            // so the last formation opacity equals the first steady opacity exactly.
+            const prem = (1 + DEPTH_AIR * (py - cy) / (size * s.a * s.p)) * (1 + PERIHELION_PEAK * (0.5 + 0.5 * Math.cos(t2)));
+            setAttr(g, "opacity", (s.base * appear * (1 + zDepth * 0.5) * (1 + relaxDid * (prem - 1))).toFixed(3));
+          } else {
+            // ── Steady-state path (ε-gated) ──────────────────────────
+            const lx = starLast[i * 2];
+            const ly = starLast[i * 2 + 1];
+            const dx = x - lx;
+            const dy = y - ly;
+            if (dx * dx + dy * dy >= STAR_EPS_SQ) {
+              g.style.transform = `translate(${x.toFixed(2)}px,${y.toFixed(2)}px)`;
+              starLast[i * 2] = x;
+              starLast[i * 2 + 1] = y;
+            }
+            const ignite = igniteRef.current?.[i] ?? 0;
+            const tgt = igniteTargetRef.current?.[i] ?? 0;
+            const velArr = igniteVelRef.current;
+            let vel = velArr?.[i] ?? 0;
+            if (vel !== 0 || Math.abs(tgt - ignite) > IGNITE_SPRING_CUTOFF) {
+              vel = (vel + (tgt - ignite) * IGNITE_SPRING_K) * IGNITE_SPRING_D;
+              if (velArr) velArr[i] = vel;
+              if (igniteRef.current) igniteRef.current[i] = ignite + vel;
+            }
+            const current = igniteRef.current?.[i] ?? ignite;
+            // Premium star life (settled only): airmass depth shading across the
+            // orbit (near-side reads brighter, far side dimmer → the plane has
+            // volume) + a gentle sparkle as each star passes its own perihelion
+            // (once per orbit, ~8% peak). Both live INSIDE the existing opacity
+            // write — zero extra DOM writes. Reduced-motion skips this loop.
+            const depthT = (y - cy) / (size * s.a * s.p);
+            const periF = 0.5 + 0.5 * Math.cos(t2);
+            const premiumLife = (1 + DEPTH_AIR * depthT) * (1 + PERIHELION_PEAK * periF);
+            setAttr(g, "opacity", (s.base * (1 + IGNITE_BOOST * current) * coilRef.current * premiumLife).toFixed(3));
           }
-          const ignite = igniteRef.current?.[i] ?? 0;
-          const tgt = igniteTargetRef.current?.[i] ?? 0;
-          const velArr = igniteVelRef.current;
-          // Damped velocity spring: overshoots ~1.06 then settles (follow-through).
-          let vel = velArr?.[i] ?? 0;
-          if (vel !== 0 || Math.abs(tgt - ignite) > IGNITE_SPRING_CUTOFF) {
-            vel = (vel + (tgt - ignite) * IGNITE_SPRING_K) * IGNITE_SPRING_D;
-            if (velArr) velArr[i] = vel;
-            if (igniteRef.current) igniteRef.current[i] = ignite + vel;
-          }
-          const current = igniteRef.current?.[i] ?? ignite;
-          setAttr(g, "opacity", (s.base * (1 + IGNITE_BOOST * current) * coilRef.current).toFixed(3));
         }
         const line = lineRefs.current[i];
         if (line) {
@@ -1418,6 +1757,30 @@ export default function OrbitalRing({
             setAttr(line, "y2", ptrY2);
           }
           setAttr(line, "opacity", a.toFixed(3));
+        }
+      }
+
+      // Formation scenery emerge: band trio (halo→core), guide ring, sun, comet
+      // fade in as the whip relaxes into the final rings. After FORM_END all are
+      // 1 and this whole block is skipped by the outer gate.
+      if (birthRef.current) {
+        const bEm = (start: number) =>
+          easeInOutCubic(Math.min(1, Math.max(0, (t - start) / FORM_SCENERY_DUR)));
+        const ba = bandBirthRefs.current;
+        for (let i = 0; i < ba.length; i++) {
+          const bg = ba[i];
+          if (bg) setAttr(bg, "opacity", bEm(FORM_BANDS_0 + i * FORM_BANDS_STEP).toFixed(3));
+        }
+        if (guideBirthRef.current) {
+          setAttr(guideBirthRef.current, "opacity", (tuning.guideOpacity * bEm(FORM_BANDS_0)).toFixed(3));
+        }
+        if (sunBirthRef.current) {
+          const sp = easeInOutCubic(Math.min(1, Math.max(0, (t - FORM_SUN) / FORM_SCENERY_DUR)));
+          setAttr(sunBirthRef.current, "opacity", sp.toFixed(3));
+        }
+        if (cometBirthRef.current) {
+          const cp = easeInOutCubic(Math.min(1, Math.max(0, (t - FORM_COMET) / FORM_SCENERY_DUR)));
+          setAttr(cometBirthRef.current, "opacity", cp.toFixed(3));
         }
       }
 
@@ -1534,7 +1897,7 @@ export default function OrbitalRing({
       io.disconnect();
       stop();
     };
-  }, [stars, comet, reducedEff, interactive, cx, cy, reactRadius, size, paintConstellation]);
+  }, [stars, comet, reducedEff, interactive, cx, cy, reactRadius, size, paintConstellation, formStagger, tuning]);
 
   const applyLines = (ptr: { x: number; y: number }) => {
     for (let i = 0; i < stars.length; i++) {
@@ -1555,13 +1918,15 @@ export default function OrbitalRing({
     const out: [number, number][] = new Array(stars.length);
     for (let i = 0; i < stars.length; i++) {
       const s = stars[i];
-      out[i] = orbitScreenPos(s, s.M0 + (2 * Math.PI * t) / s.P, cx, cy);
+      // Same breathing as the rAF loop so constellation snap/targets track the
+      // real star positions (not the pure-Kepler ideal).
+      out[i] = orbitScreenPos(s, s.M0 + (2 * Math.PI * t) / s.P + orbBreath(t, s.M0), cx, cy);
     }
     return out;
   };
 
   const rollConstellation = (ptr: { x: number; y: number }, posIn?: [number, number][]) => {
-    if (!interactive || stars.length < 2) return;
+    if (!interactive || stars.length < 2 || birthRef.current) return;
     const pos = posIn ?? computeLivePositions(timeRef.current);
     const usable = CONSTELLATIONS.filter((cn) => cn.vertices.length <= stars.length);
     const curName = constellationStateRef.current?.name;
@@ -1691,6 +2056,22 @@ export default function OrbitalRing({
     paintConstellation(ptr, pos, reducedEff);
   };
 
+  // Centre "star-birth" figure: fires once (module latch) the moment the
+  // formation settles, drawing a constellation at the ring's centre — the
+  // "birth" of the star figure in the middle orbit. Wired through autoDrawRef
+  // (declared up top) so the frame loop can call it without a use-before-define.
+  const autoAutoDraw = () => {
+    if (interactive && !reducedEff && !constellationAutoDrawn) {
+      constellationAutoDrawn = true;
+      // Match against the live settle-time positions so the figure lands on the
+      // stars where they ACTUALLY are (lines then follow them via paintConstellation).
+      rollConstellation({ x: cx, y: cy }, computeLivePositions(timeRef.current));
+    }
+  };
+  useEffect(() => {
+    autoDrawRef.current = autoAutoDraw;
+  });
+
   const updateTargetAlpha = (ptr: { x: number; y: number }, pos: [number, number][]) => {
     const c = constellationStateRef.current;
     if (!c) {
@@ -1722,7 +2103,7 @@ export default function OrbitalRing({
   };
 
   const handleMove = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (!interactive) return;
+    if (!interactive || birthRef.current) return;
     const el = wrapRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -1759,7 +2140,7 @@ export default function OrbitalRing({
   };
 
   const handleEnter = () => {
-    if (!interactive) return;
+    if (!interactive || birthRef.current) return;
     setHovering(true);
     const ptr = pointerRef.current ?? { x: cx, y: cy };
     rollConstellation(ptr, computeLivePositions(timeRef.current));
@@ -1929,15 +2310,16 @@ export default function OrbitalRing({
           </filter>
         </defs>
 
-        <circle cx={cx} cy={cy} r={size * 0.42} fill={`url(#${id}-glow)`} className="glow-pulse" />
+        <circle ref={bgGlowRef} cx={cx} cy={cy} r={size * 0.42} fill={`url(#${id}-glow)`} opacity={0.5} />
 
         <circle
+          ref={guideBirthRef}
           cx={cx} cy={cy}
           r={size * 0.425}
           fill="none"
           stroke="#38BDF8"
           strokeWidth={size * 0.0025}
-          opacity={tuning.guideOpacity}
+          opacity={doBirth ? 0 : tuning.guideOpacity}
           filter={`url(#${id}-haloblur)`}
         />
 
@@ -1951,7 +2333,12 @@ export default function OrbitalRing({
           ];
           if (variant === "constellation") {
             return (
-              <g key={i} transform={`rotate(${rotate},${cx},${cy})`}>
+              <g
+                key={i}
+                ref={(el) => { bandBirthRefs.current[i] = el; }}
+                transform={`rotate(${rotate},${cx},${cy})`}
+                opacity={doBirth ? 0 : 1}
+              >
                 {layers.map(({ layer, f }) => (
                   <ellipse
                     key={f}
@@ -2019,7 +2406,7 @@ export default function OrbitalRing({
           <g
             key={s.k}
             ref={(el) => { starRefs.current[i] = el; }}
-            opacity={s.base}
+            opacity={doBirth ? 0 : s.base}
             transform={`translate(${s.x},${s.y})`}
             style={{ willChange: "transform" }}
           >
@@ -2029,12 +2416,14 @@ export default function OrbitalRing({
           </g>
         ))}
 
-        <circle cx={cx} cy={cy} r={size * 0.075} fill={`url(#${id}-solar-corona)`} />
-        <circle cx={cx} cy={cy} r={size * 0.024} fill={`url(#${id}-solar-disk)`} />
-        <circle cx={cx} cy={cy} r={size * 0.011} fill="#FFFDF8" opacity="0.9" filter={`url(#${id}-coreblur)`} />
+        <g ref={sunBirthRef} opacity={doBirth ? 0 : 1}>
+          <circle cx={cx} cy={cy} r={size * 0.075} fill={`url(#${id}-solar-corona)`} />
+          <circle cx={cx} cy={cy} r={size * 0.024} fill={`url(#${id}-solar-disk)`} />
+          <circle cx={cx} cy={cy} r={size * 0.011} fill="#FFFDF8" opacity="0.9" filter={`url(#${id}-coreblur)`} />
+        </g>
 
         {interactive && comet && cometGeo && (
-          <>
+          <g ref={cometBirthRef} opacity={doBirth ? 0 : 1}>
             <path
               ref={fanPathRef}
               d={cometGeo ? fanPath(cometGeo) : ""}
@@ -2122,7 +2511,7 @@ export default function OrbitalRing({
               <circle cx={0} cy={0} r={size * 0.016} fill="#7CFCA8" opacity="0.26" filter={`url(#${id}-coreblur)`} />
               <circle cx={0} cy={0} r={size * 0.0085} fill="#FFF3DC" />
             </g>
-          </>
+          </g>
         )}
 
         {!reducedEff && !interactive && (

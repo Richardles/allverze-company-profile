@@ -246,6 +246,7 @@ export default function About() {
                 {missionPillars.map((pillar, i) => (
                   <li key={i} className="flex gap-3 items-start">
                     <span
+                      className="tnum"
                       style={{
                         width: 22, height: 22, borderRadius: 6,
                         background: "rgba(0,85,229,0.09)", color: "#0055E5",
@@ -369,7 +370,7 @@ export default function About() {
               </h2>
               <p
                 style={{
-                  fontFamily: "Georgia, serif",
+                  fontFamily: "'Instrument Serif', Georgia, serif",
                   fontStyle: "italic",
                   fontSize: "clamp(1.4rem, 2.5vw, 1.85rem)",
                   lineHeight: 1.45,
@@ -390,6 +391,7 @@ export default function About() {
               {people.map((p, i) => (
                 <div key={p.title} className="flex gap-4">
                   <div
+                    className="tnum"
                     style={{
                       width: 34, height: 34, borderRadius: 9,
                       background: isDark ? "rgba(0,85,229,0.10)" : "rgba(0,85,229,0.08)",
