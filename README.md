@@ -59,7 +59,9 @@ There is **no HTTP client dependency**: `server/src/lib/resend.js` uses Node's b
 | Service | Used for |
 |---|---|
 | **Resend** | Transactional email over HTTPS (`api.resend.com`); expects a `re_…` API key |
+| **Resend Forge** | Resend's sending engine behind the `mail.allverze.com` return-path (see [Email deliverability](#email-deliverability)) |
 | **Zoho Mail** | Receives leads at `hello@allverze.com` (inbox only on the free plan) |
+| **Mail-Tester** | Free deliverability/spam check of a real sent message (3 tests per 24 h) |
 | **Vercel** (Hobby) | Production host for the API |
 | **Cloudflare Pages + DNS** | Production host for the site (`www.allverze.com` is canonical) |
 | **Cloudflare Tunnel** | Optional live preview from this machine (`preview.allverze.com`) |
@@ -313,6 +315,109 @@ Helmet security headers, a single-origin CORS allowlist (`FRONTEND_URL`), a 10 k
 
 ---
 
+## Email deliverability
+
+### Sending path
+
+Both emails go out through **Resend over HTTPS** (`POST https://api.resend.com/emails`) — there is no SMTP handshake, which is what took the form from ~4.5 s to a typical ~1 s (measured 0.94–1.68 s server-side across five real submissions). `From` is `Allverze Corporation <SMTP_FROM>` on the verified `allverze.com` domain, and **Resend derives the envelope sender** (the `Return-Path`); the application never sets one. Each send carries an `Idempotency-Key` (`{leadRef}-inbound` / `-confirmation`) so a retry after an ambiguous timeout cannot double-send.
+
+The credential is a Resend **API key** (`re_…`) stored in `SMTP_PASS`. The variable name is historical — it dates from the retired nodemailer path — and is kept deliberately so no host dashboard needs changing.
+
+### DNS records that make it work
+
+| Record | Purpose |
+|---|---|
+| `resend._domainkey.allverze.com` TXT | Resend DKIM, selector `s=resend` (1024-bit) |
+| `send.allverze.com` MX → `feedback-smtp.ap-northeast-1.amazonses.com` | SES return-path host (**current** engine) |
+| `send.allverze.com` TXT `v=spf1 include:amazonses.com ~all` | SPF for that return-path |
+| `mail.allverze.com` CNAME → `send.forge.rmta.net` | **Resend Forge** return-path host |
+| `_dmarc.allverze.com` TXT `v=DMARC1; p=quarantine;` | DMARC policy, relaxed alignment (no `adkim`/`aspf`) |
+
+Root `allverze.com` keeps its own SPF (`include:zohomail.com`) for Zoho sending — the `send`/`mail` subdomains are separate and do not touch it.
+
+Two consequences worth knowing before editing DNS:
+
+- **`mail.allverze.com` is a CNAME**, so it can never carry its own A/TXT/MX records — Forge supplies them by aliasing. Changing the return-path later is therefore *not* a DNS edit: it is **Resend → Domains → Finish Forge setup → Change**, which re-runs verification.
+- The Forge CNAME must stay **DNS only** in Cloudflare (grey cloud). Proxying it (orange cloud) puts Cloudflare in front of the return-path host and breaks SPF alignment.
+
+### Resend Forge — "Enabled" is not "Active"
+
+Forge is Resend's sending engine behind the `mail.allverze.com` return-path (us-east-1 only). A verified domain moves **Enabled → Active**, and DNS verification completes long before traffic is migrated. **Until the dashboard shows Active, mail keeps leaving through SES** — that is expected, not a misconfiguration.
+
+The dashboard alone will not tell you which engine actually carried a message. Read the received headers:
+
+| Header | SES (pre-migration) | Forge (post-migration) |
+|---|---|---|
+| `Bounce address` / `Return-Path` | `…@send.allverze.com` | `…@mail.allverze.com` |
+| `Received` / HELO / rDNS | `*.smtp-out.ap-northeast-1.amazonses.com` | Forge host |
+| `Feedback-ID` | `…:AmazonSES` | — |
+
+Authentication is unaffected either way: both paths pass SPF, DKIM and DMARC (relaxed alignment covers the From/Return-Path domain difference). `send.allverze.com` is kept deliberately as the fallback.
+
+### Verifying with Mail-Tester
+
+Mail-Tester gives you a disposable address, scans the message that lands there, and reports SpamAssassin + authentication. Free tier: **3 tests per 24 h per IP**; results stay viewable for 7 days. One address per test — sending twice to the same address replaces the earlier result.
+
+1. Open <https://www.mail-tester.com/>, copy the address already shown in the field (e.g. `test-ab12cd34e@srv1.mail-tester.com`). **Do not reload after copying** — a reload generates a new address.
+2. Submit the contact form with that address as the visitor's email. The confirmation email is the one that gets scored.
+3. Wait 30–60 s, then click **"Then check your score"** — or open the permanent URL:
+   `https://www.mail-tester.com/check?id=<the address>`
+4. Read these rows, in this order:
+
+| Row | What it tells you |
+|---|---|
+| `Score: x/10` | Overall. 10/10 is achievable on this setup. |
+| `Bounce address` | Which engine sent it — see the Forge table above. |
+| `X-Spam-Last-External-HELO` / `-rDNS` / `-IP` | Same answer, from the receiving side. |
+| `Authentication-Results` | Want `spf=pass`, `dkim=pass` twice (`d=allverze.com` s=resend, and `d=amazonses.com`), `dmarc=pass`. |
+| `X-Spam-Status` / `X-Spam-Report` | `No/-0.1/5.0` with only `HTML_MESSAGE`-class 0.001 noise is clean. |
+
+### Scoring the lead notification too
+
+The customer confirmation is easy — point the form's email field at the tester address. The **lead** email always goes to `CONTACT_EMAIL`, so scoring it means redirecting that. Do it with a throwaway second instance instead of editing `.env`:
+
+```powershell
+# Terminal A — repo root. dotenv does NOT override variables already in the shell,
+# so these win over .env and the running :3001 instance is left untouched.
+$env:CONTACT_EMAIL='test-ab12cd34e@srv1.mail-tester.com'
+$env:PORT='3002'
+node server/server.mjs
+
+# Terminal B — the form email is a real address, so only the LEAD is scored.
+$body = @{
+  name     = 'Deliverability Check'
+  email    = 'richardles@allverze.com'
+  phone    = '+62 812 8381 2336'
+  message  = 'Inbound template scan'
+  timezone = 'Asia/Jakarta'
+  stage    = 'Not sure yet'
+} | ConvertTo-Json
+Invoke-RestMethod -Uri 'http://localhost:3002/api/contact' -Method Post -ContentType 'application/json' -Body $body
+```
+
+On bash, `curl -s -X POST http://localhost:3002/api/contact -H 'Content-Type: application/json' -d '{"name":"…","email":"…","phone":"…","message":"…"}'` does the same. **Do not use `curl.exe` from PowerShell** — PS 5.1 strips the inner double quotes, the server receives malformed JSON, and you get a `500 Internal server error` with nothing in the submission log (the request fails before the route).
+
+Verify the redirect took by watching that second terminal's boot log — it prints the real destination:
+
+```
+[inbound-email] Sent inquiry AVZ-OTH-… to test-ab12cd34e@srv1.mail-tester.com
+```
+
+Then `Ctrl+C` the instance. Nothing persists.
+
+### Measured results
+
+| Message | Score | Notes |
+|---|---|---|
+| Customer confirmation | **10/10** | `spf=pass`, `dkim=pass` ×2, `dmarc=pass`, rDNS pass, `X-Spam-Status: No/-0.1/5.0` |
+| Lead notification | **7.3/10** | Same authentication; the 2.7 deduction is entirely `FREEMAIL_FORGED_REPLYTO=2.503` + `FREEMAIL_REPLYTO_END_DIGIT=0.25` |
+
+**Why the lead email scores lower — and why it is fine.** The lead template sets `Reply-To:` to the *visitor's* address, so a Gmail address produces: author domain `allverze.com` + freemail Reply-To → SpamAssassin reads it as a reply-hijack pattern. It fires only for freemail senders (a company domain does not trigger it), it affects nothing the customer ever receives, and the message only travels to `hello@` at Zoho, which does not run that ruleset. Removing the visitor's address from `Reply-To` would fix the score and break one-click reply — not a trade worth making. Treat it as a test artifact.
+
+Known time-based deductions that resolve on their own: domain age (`FROM_FMBLA_NEWDOM`, gone as of the 10/10 result) and Resend's shared-IP reputation.
+
+---
+
 ## Submission log
 
 Every submission event is appended to `logs/contact.jsonl` — one JSON object per line, with **`tag` as the first key**, so problems can be grepped without parsing:
@@ -420,6 +525,8 @@ Node is pinned to `22.x` via `engines`, and `server/package-lock.json` is commit
 
 `api.allverze.com` ← Cloudflare CNAME `api → cname.vercel-dns.com` (proxied is fine). Vercel issues the certificate automatically.
 
+Email records (`resend._domainkey`, `send`, `mail`, `_dmarc`) are separate from the website and are covered in [Email deliverability](#email-deliverability). Do not proxy the `mail` CNAME.
+
 ### Verifying after deploy
 
 - Submit the form from **both** `allverze.com` and `www.allverze.com` (proves the CORS canonical).
@@ -468,7 +575,11 @@ Manual smoke pass after a change to the contact flow:
 | Contact form returns `500` | The lead email failed (bad Resend key, unverified domain, or Resend outage). Expected behaviour — never a silent success. |
 | Confirmation never arrives | Check the log for `confirmation: "failed"`; `"pending"` means it was deferred by the budget and usually lands seconds later. |
 | `npm install` inside `client/` or `server/` behaves oddly | npm walks up and detects the monorepo. Always install from the repo root. |
+| Contact form returns `500` with no record in the submission log | The request body was not valid JSON, so it failed in `express.json()` before the route ran — nothing is logged. Usually PowerShell quote mangling: use `Invoke-RestMethod` rather than `curl.exe`. |
 | Emails land in spam | Resend's shared IP reputation and domain age dominate; SPF/DKIM/DMARC are already live for `allverze.com`. |
+| Mail-Tester shows a price list instead of a report | The free quota (3 tests / 24 h / IP) is used up. Wait, or buy a pack. |
+| Received mail still shows `…@send.allverze.com` | Resend Forge has not reached **Active** yet. DNS is verified; traffic migrates later. Harmless. |
+| A new Forge return-path "did not apply" | `mail.allverze.com` is a CNAME — change it in Resend (`Finish Forge setup → Change`), not in Cloudflare. |
 
 ---
 
