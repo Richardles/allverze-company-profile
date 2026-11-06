@@ -15,7 +15,8 @@
     "lint": "npm run lint -w client && npm run lint -w server",
     "server": "node server/server.mjs",
     "start": "node server/server.mjs",
-    "preview": "npm run preview -w client"
+    "preview": "npm run preview -w client",
+    "logs:contact": "node scripts/contact-log.mjs"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"

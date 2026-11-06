@@ -7,6 +7,7 @@ const DEFAULTS = {
   frontendUrl: 'http://localhost:5173',
   timezone: 'Asia/Jakarta',
   timezoneLabel: 'WIB',
+  contactLogPath: 'logs/contact.jsonl',
 };
 
 /**
@@ -35,5 +36,6 @@ export function loadConfig() {
     frontendUrl: process.env.FRONTEND_URL || DEFAULTS.frontendUrl,
     timezone: process.env.TIMEZONE || DEFAULTS.timezone,
     timezoneLabel: process.env.TIMEZONE_LABEL || DEFAULTS.timezoneLabel,
+    contactLogPath: process.env.CONTACT_LOG_PATH || DEFAULTS.contactLogPath,
   };
 }

@@ -51,6 +51,35 @@ Other commands:
 - `npm run build` — `tsc -b && vite build` inside `client/` → `client/dist/` (must pass before deploy).
 - `npm run lint` — ESLint for both `client` and `server` (must be 0 errors).
 - `npm run server` / `npm start` — run the email API only.
+- `npm run logs:contact` — read the submission log (see below).
+
+## Submission log
+
+Every contact-form event is appended to `logs/contact.jsonl` — one JSON object per line, `tag` first so you can grep problems without parsing:
+
+```
+Select-String logs\contact.jsonl -Pattern '^\{"tag":"BOT"'
+Select-String logs\contact.jsonl -Pattern '^\{"tag":"FAIL"'
+```
+
+**Timeline.** `received` (arrives before the emails are sent, carries the message body) → `response` (what the visitor is waiting on) → `complete` (both emails have actually settled; may land after the response when the confirmation was deferred by the 2.7s budget). Lines for one submission share an `id` (`sub_xxxxxxxx`) and, once minted, a `leadRef`.
+
+**Tags.** `OK` (normal), `BOT` (honeypot), `FAIL` (rejected input or undelivered confirmation), `THROTTLED` (rate limit), `ERROR` (unexpected exception). Everything except `OK` also carries `problem: true` and a `reason`. The same records are mirrored to the console with a colored `[TAG]` prefix.
+
+**Reading it.**
+
+```
+npm run logs:contact                  # last 20, rendered
+npm run logs:contact -- --tail 5      # last 5
+npm run logs:contact -- --all         # everything
+npm run logs:contact -- --problems    # BOT + FAIL + ERROR + THROTTLED only
+npm run logs:contact -- --bots        # honeypot hits only
+npm run logs:contact -- --failures    # rejected submissions + hard errors
+npm run logs:contact -- --json        # raw JSONL, no rendering
+npm run logs:contact -- --path <file> # a different log file
+```
+
+**Notes.** The file holds real customer data, so it is gitignored and rotates to a single `.1` file at 5MB. Logging is fire-and-forget: it never adds latency to a response. On Vercel the filesystem is read-only and background work can be frozen after the response, so the server writes the same JSON lines to stdout (the platform log stream) instead of pretending a file would persist.
 
 ## Local preview via Cloudflare Tunnel
 

@@ -6,6 +6,20 @@ const TIMEZONE_PATTERN = /^[A-Za-z_+\-/]{1,64}$/;
 const STAGE_MAX_LENGTH = 80;
 
 /**
+ * Client clocks drift, and a hand-crafted request can send anything at all.
+ * `clickedAt` is only used to measure "click -> both emails settled", so a value
+ * wildly far from server time is dropped rather than trusted or rejected.
+ */
+const CLICKED_AT_MAX_SKEW_MS = 10 * 60 * 1000;
+
+function normalizeClickedAt(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  const epoch = Math.round(value);
+  if (Math.abs(Date.now() - epoch) > CLICKED_AT_MAX_SKEW_MS) return undefined;
+  return epoch;
+}
+
+/**
  * Project stage is a free-text, optional field: no allowlist, so stages can be
  * added or renamed on the client without a server change. Anything unusable is
  * dropped rather than rejected — an optional field must never block a real lead.
@@ -32,7 +46,7 @@ function isValidTimezone(value) {
 }
 
 export function validateContactInput(input) {
-  const { name, email, phone, message, timezone, stage } = input;
+  const { name, email, phone, message, timezone, stage, clickedAt } = input;
   const trimmedName = typeof name === 'string' ? name.trim() : '';
   const trimmedEmail = typeof email === 'string' ? email.trim() : '';
   const trimmedPhone = typeof phone === 'string' ? phone.trim() : '';
@@ -60,8 +74,14 @@ export function validateContactInput(input) {
       : undefined;
 
   const validStage = normalizeStage(stage);
+  const warnings = [];
   if (stage !== undefined && validStage === undefined) {
-    console.warn('[validation] Dropped unusable project stage value');
+    warnings.push('dropped unusable project stage');
+  }
+
+  const validClickedAt = normalizeClickedAt(clickedAt);
+  if (clickedAt !== undefined && validClickedAt === undefined) {
+    warnings.push('dropped unusable clickedAt');
   }
 
   return {
@@ -73,6 +93,10 @@ export function validateContactInput(input) {
       message: trimmedMessage,
       timezone: validTimezone,
       stage: validStage,
+      clickedAt: validClickedAt,
     },
+    // Returned rather than console-warned so the caller can attach them to the
+    // lead's log record; a bare warning would have no identity next to it.
+    warnings,
   };
 }

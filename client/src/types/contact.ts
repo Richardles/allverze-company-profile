@@ -17,6 +17,12 @@ export interface ContactPayload extends ContactFormState {
   botcheck?: string;
   timezone?: string;
   stage?: string;
+  /**
+   * Epoch ms captured the instant "Send Message" was clicked. Server-side it is
+   * only used to measure click -> both-emails-settled; it is dropped if it is
+   * wildly off from server time, so a wrong client clock cannot corrupt the log.
+   */
+  clickedAt?: number;
 }
 
 export interface ContactResponse {

@@ -5,11 +5,14 @@ import rateLimit from 'express-rate-limit';
 import { createContactRouter } from './routes/contact.js';
 import { healthRouter } from './routes/health.js';
 import { createEmailService } from './services/emailService.js';
+import { createSubmissionLogger } from './lib/submissionLog.js';
 
 const CONTACT_LIMITER_OPTIONS = {
   windowMs: 15 * 60 * 1000,
   max: 20,
 };
+
+const RATE_LIMIT_MESSAGE = 'Too many requests. Please try again later.';
 
 export function createApp(config) {
   const app = express();
@@ -19,17 +22,28 @@ export function createApp(config) {
   app.use(cors({ origin: config.frontendUrl, credentials: true }));
   app.use(express.json({ limit: '10kb' }));
 
+  const submissionLog = createSubmissionLogger(config);
+
   const contactLimiter = rateLimit({
     ...CONTACT_LIMITER_OPTIONS,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { success: false, message: 'Too many requests. Please try again later.' },
+    // A custom handler (instead of the `message` option) so throttling is
+    // recorded too: this middleware runs before the route, so the router's own
+    // logging never sees these requests.
+    handler: (req, res) => {
+      submissionLog.log('THROTTLED', 'submission.throttled', {
+        reason: `rate limit (${CONTACT_LIMITER_OPTIONS.max}/${CONTACT_LIMITER_OPTIONS.windowMs / 60000}min)`,
+        ip: req.ip,
+      });
+      res.status(429).json({ success: false, message: RATE_LIMIT_MESSAGE });
+    },
   });
 
   const emailService = createEmailService(config);
 
   app.use('/api/health', healthRouter);
-  app.use('/api/contact', contactLimiter, createContactRouter(emailService));
+  app.use('/api/contact', contactLimiter, createContactRouter(emailService, submissionLog));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

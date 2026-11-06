@@ -21,6 +21,8 @@ export function ContactFormProvider({ children }: { children: ReactNode }) {
 
   const handleSubmit = useCallback(async () => {
     if (sending) return;
+    // First line of the click handler: the audit log measures from here.
+    const clickedAt = Date.now();
     setSending(true);
     setError("");
     try {
@@ -29,6 +31,7 @@ export function ContactFormProvider({ children }: { children: ReactNode }) {
         message: `[Intent: ${intent}]\n\n${form.message}`,
         botcheck: "",
         timezone: getBrowserTimezone(),
+        clickedAt,
         ...(stage ? { stage } : {}),
       });
       setConfirmation(
