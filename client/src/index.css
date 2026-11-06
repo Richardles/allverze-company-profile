@@ -199,16 +199,24 @@ body {
   }
 }
 
-/* ?perf&grainoff debug mode: suppress the full-viewport blend + header blur to
-   measure their frame-time contribution on a real phone (HUD gated, inert by default). */
+/* ?perf debug mode: independently suppress each compositing layer to measure its
+   frame-time contribution on a real phone. Query-gated, inert by default.
+   Flags: ?perf=1 (&grainoff/&shimmeroff/&bluroff/&ringoff) or ?perf=0 for all off. */
 [data-perf-grain="0"] .grain,
-[data-perf-grain="0"] .grain-iconic,
-[data-perf-grain="0"] .logo-shimmer {
+[data-perf-grain="0"] .grain-iconic {
   opacity: 0 !important;
 }
-[data-perf-grain="0"] header {
+[data-perf-shimmer="0"] .logo-shimmer {
+  opacity: 0 !important;
+}
+[data-perf-blur="0"] header {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
+}
+[data-perf-ring="0"] [data-perf-ring-root] {
+  /* display:none (not visibility) so the ring's IntersectionObserver reports
+     not-intersecting and its rAF loop actually stops — full CPU+raster isolation. */
+  display: none !important;
 }
 
 /* T3 · ambient key-light glows */
@@ -352,8 +360,12 @@ body {
   transform-origin: center;
   background: radial-gradient(circle, #ffffff 0%, rgba(160, 230, 255, 0.65) 35%, rgba(56, 189, 248, 0) 72%);
   box-shadow: 0 0 6px rgba(56, 189, 248, 0.55);
-  will-change: opacity, transform;
   animation: logo-shimmer var(--s-dur, 4s) ease-in-out var(--s-delay, 0s) infinite alternate;
+}
+/* Off-screen pause (IntersectionObserver sets data-paused) — animations freeze
+   instead of advancing forever, and the layer can be reclaimed while hidden. */
+.logo-shimmer[data-paused="1"] .logo-shimmer__dot {
+  animation-play-state: paused;
 }
 @keyframes logo-shimmer {
   from { opacity: var(--s-min, 0.12); transform: scale(0.8); }

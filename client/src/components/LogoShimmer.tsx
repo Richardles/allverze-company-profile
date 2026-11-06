@@ -116,6 +116,21 @@ export default function LogoShimmer({
     return () => ro.disconnect();
   }, [baseCount, minCount]);
 
+  // Pause the shimmer's CSS animations while the hero is scrolled out of view —
+  // the dots keep breathing forever otherwise, burning compositor time off-screen.
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        host.dataset.paused = entries[0].isIntersecting ? "0" : "1";
+      },
+      { threshold: 0 },
+    );
+    io.observe(host);
+    return () => io.disconnect();
+  }, []);
+
   const dots = useMemo(() => (pool ? pool.slice(0, count) : []), [pool, count]);
 
   return (

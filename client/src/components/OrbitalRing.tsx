@@ -59,6 +59,8 @@ interface Orbit {
   theta: number;
   p: number;
   P: number;
+  /* Last-frame eccentric-anomaly seed for the Newton solve (warm start). */
+  _seedE?: number;
 }
 
 interface Star extends Orbit {
@@ -558,9 +560,8 @@ function paintGlowLine(
 }
 
 /* Newton iterates on the eccentric anomaly; seeded from the previous frame's
-   solution per orbit (WeakMap keyed by the stable orbit object) it converges in
-   one or two passes instead of a fixed five. */
-const keplerSeedCache = new WeakMap<object, number>();
+   solution stored on the orbit object itself, it converges in one or two passes
+   instead of a fixed five. */
 function keplerSolve(M: number, e: number, seed?: number): number {
   let E = seed ?? M + e * Math.sin(M);
   for (let i = 0; i < 4; i++) {
@@ -592,14 +593,13 @@ function grainOrbitsFor(o: Orbit): Orbit[] {
 }
 
 function orbitScreenPos(
-  o: Pick<Orbit, "a" | "e" | "omega" | "theta" | "p">,
+  o: Pick<Orbit, "a" | "e" | "omega" | "theta" | "p" | "_seedE">,
   M: number,
   cx: number,
   cy: number,
 ): [number, number] {
-  const seed = keplerSeedCache.get(o as object);
-  const E = keplerSolve(M, o.e, seed);
-  keplerSeedCache.set(o as object, E);
+  const E = keplerSolve(M, o.e, o._seedE);
+  o._seedE = E;
   const r = o.a * (1 - o.e * Math.cos(E));
   const nu = 2 * Math.atan2(
     Math.sqrt(1 + o.e) * Math.sin(E / 2),
@@ -618,15 +618,14 @@ function orbitScreenPos(
 /* Zero-allocation variant: writes into a caller-supplied [x,y] buffer
    instead of returning a new tuple — eliminates ~27 tuple allocs/frame. */
 function orbitScreenPosInto(
-  o: Pick<Orbit, "a" | "e" | "omega" | "theta" | "p">,
+  o: Pick<Orbit, "a" | "e" | "omega" | "theta" | "p" | "_seedE">,
   M: number,
   cx: number,
   cy: number,
   out: [number, number],
 ): void {
-  const seed = keplerSeedCache.get(o as object);
-  const E = keplerSolve(M, o.e, seed);
-  keplerSeedCache.set(o as object, E);
+  const E = keplerSolve(M, o.e, o._seedE);
+  o._seedE = E;
   const r = o.a * (1 - o.e * Math.cos(E));
   const nu = 2 * Math.atan2(
     Math.sqrt(1 + o.e) * Math.sin(E / 2),
@@ -877,7 +876,7 @@ export default function OrbitalRing({
     return out;
   }, [doBirth, stars]);
 
-  const comet = useMemo(
+  const comet = useMemo<Orbit | null>(
     () => {
       if (!tuning.starNodes) return null;
       return {
@@ -1465,7 +1464,7 @@ export default function OrbitalRing({
       // COMET_SUB_STEP gate below. Math is identical to the sub-stepped
       // cometGeometry — same Kepler seeds, same ε-gates — just fresher.
       orbitScreenPosInto(comet, M, cx, cy, COMET_HEAD_BUF);
-      const ehSeed = keplerSeedCache.get(comet as object);
+      const ehSeed = comet._seedE;
       const ehE = keplerSolve(M, comet.e, ehSeed);
       const ehR = Math.max(comet.a * (1 - comet.e * Math.cos(ehE)), 0.0001);
       const ehRR = (comet.a / ehR) * (comet.a / ehR);
@@ -1925,6 +1924,15 @@ export default function OrbitalRing({
     return out;
   };
 
+  // The rAF loop already solves every star each frame into posBufRef; reuse that
+  // buffer for pointer hit-testing instead of re-solving 27 orbits per mousemove
+  // (which can fire 100s of times/sec). Falls back to a fresh solve when the
+  // buffer isn't populated (reduced-motion, or before the loop's first frame).
+  const livePos = (): [number, number][] =>
+    !reducedEff && posBufRef.current.length === stars.length
+      ? posBufRef.current
+      : computeLivePositions(timeRef.current);
+
   const rollConstellation = (ptr: { x: number; y: number }, posIn?: [number, number][]) => {
     if (!interactive || stars.length < 2 || birthRef.current) return;
     const pos = posIn ?? computeLivePositions(timeRef.current);
@@ -2113,7 +2121,7 @@ export default function OrbitalRing({
       y: ((e.clientY - rect.top) / rect.height) * size,
     };
     pointerRef.current = ptr;
-    const pos = computeLivePositions(timeRef.current);
+    const pos = livePos();
     let ni = -1;
     let nd = Infinity;
     for (let i = 0; i < stars.length; i++) {
@@ -2134,7 +2142,7 @@ export default function OrbitalRing({
     if (dwellRef.current) clearTimeout(dwellRef.current);
     dwellRef.current = setTimeout(() => {
       const p = pointerRef.current;
-      if (p) rollConstellation(p);
+      if (p) rollConstellation(p, livePos());
     }, 2000);
     if (reducedEff) applyLines(ptr);
   };
@@ -2143,7 +2151,7 @@ export default function OrbitalRing({
     if (!interactive || birthRef.current) return;
     setHovering(true);
     const ptr = pointerRef.current ?? { x: cx, y: cy };
-    rollConstellation(ptr, computeLivePositions(timeRef.current));
+    rollConstellation(ptr, livePos());
   };
 
   const handleLeave = () => {
@@ -2168,16 +2176,21 @@ export default function OrbitalRing({
     }
   };
 
-  const staticLanesMemo = cometGeo
-    ? BETA_LADDER.map((_, i) =>
-        cometGeo.lanes[i].map(([x, y]) => `${x},${y}`).join(" "),
-      )
-    : [];
+  const staticLanesMemo = useMemo(
+    () =>
+      cometGeo
+        ? BETA_LADDER.map((_, i) =>
+            cometGeo.lanes[i].map(([x, y]) => `${x},${y}`).join(" "),
+          )
+        : [],
+    [cometGeo],
+  );
 
   return (
     <div
       ref={wrapRef}
       className={className}
+      data-perf-ring-root=""
       style={{ maxWidth: size, width: "100%", marginInline: "auto", position: "relative", willChange: "transform" }}
       {...(interactive
         ? { onMouseEnter: handleEnter, onMouseMove: handleMove, onMouseLeave: handleLeave }

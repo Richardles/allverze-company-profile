@@ -1,10 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 type Stats = { fps: number; p95: number; max: number; jank: number };
 
 const PARAMS = new URLSearchParams(window.location.search);
 const ENABLED = PARAMS.has("perf");
-const OFFGRAIN = ENABLED && (PARAMS.get("perf") === "0" || PARAMS.has("grainoff"));
+const ALL_OFF = ENABLED && PARAMS.get("perf") === "0";
+const OFFGRAIN = ALL_OFF || (ENABLED && PARAMS.has("grainoff"));
+const OFFSHIMMER = ALL_OFF || (ENABLED && PARAMS.has("shimmeroff"));
+const OFFBLUR = ALL_OFF || (ENABLED && PARAMS.has("bluroff"));
+const OFFRING = ALL_OFF || (ENABLED && PARAMS.has("ringoff"));
 
 function fmt(ms: number): string {
   return ms >= 100 ? ms.toFixed(0) : ms.toFixed(1);
@@ -12,11 +16,14 @@ function fmt(ms: number): string {
 
 export default function PerfHud() {
   const [stats, setStats] = useState<Stats | null>(null);
-  const offGrainRef = useRef(OFFGRAIN);
 
   useEffect(() => {
     if (!ENABLED) return;
-    document.documentElement.setAttribute("data-perf-grain", offGrainRef.current ? "0" : "1");
+    const root = document.documentElement;
+    root.setAttribute("data-perf-grain", OFFGRAIN ? "0" : "1");
+    root.setAttribute("data-perf-shimmer", OFFSHIMMER ? "0" : "1");
+    root.setAttribute("data-perf-blur", OFFBLUR ? "0" : "1");
+    root.setAttribute("data-perf-ring", OFFRING ? "0" : "1");
 
     const N = 120;
     const dts = new Float64Array(N);
@@ -52,13 +59,23 @@ export default function PerfHud() {
     return () => {
       cancelAnimationFrame(raf);
       window.clearInterval(timer);
-      document.documentElement.removeAttribute("data-perf-grain");
+      root.removeAttribute("data-perf-grain");
+      root.removeAttribute("data-perf-shimmer");
+      root.removeAttribute("data-perf-blur");
+      root.removeAttribute("data-perf-ring");
     };
   }, []);
 
   if (!ENABLED) return null;
 
   const color = stats ? (stats.fps >= 55 ? "#4ADE80" : "#FBBF24") : "#94A3B8";
+  const offList = [
+    OFFGRAIN && "grain",
+    OFFSHIMMER && "shimmer",
+    OFFBLUR && "blur",
+    OFFRING && "ring",
+  ].filter(Boolean);
+  const offLine = offList.length ? `off   ${offList.join(" ")}` : "off   none";
 
   return (
     <div
@@ -81,7 +98,7 @@ export default function PerfHud() {
       }}
     >
       {stats
-        ? `fps   ${stats.fps.toFixed(0)}\np95   ${fmt(stats.p95)}ms\nmax   ${fmt(stats.max)}ms\n>33ms ${stats.jank.toFixed(0)}%\n${OFFGRAIN ? "grain OFF" : "grain ON"}`
+        ? `fps   ${stats.fps.toFixed(0)}\np95   ${fmt(stats.p95)}ms\nmax   ${fmt(stats.max)}ms\n>33ms ${stats.jank.toFixed(0)}%\n${offLine}`
         : "warming\u2026"}
     </div>
   );
