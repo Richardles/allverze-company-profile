@@ -7,7 +7,7 @@ export interface ContactFormContextValue {
   sending: boolean;
   error: string;
   submitted: boolean;
-  confirmation: "sent" | "failed" | null;
+  confirmation: "sent" | "failed" | "pending" | null;
   leadRef: string | null;
   updateField: (field: keyof ContactFormState, value: string) => void;
   setIntent: (intent: ContactIntent) => void;

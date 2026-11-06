@@ -12,7 +12,7 @@ export function ContactFormProvider({ children }: { children: ReactNode }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [confirmation, setConfirmation] = useState<"sent" | "failed" | null>(null);
+  const [confirmation, setConfirmation] = useState<"sent" | "failed" | "pending" | null>(null);
   const [leadRef, setLeadRef] = useState<string | null>(null);
 
   const updateField = useCallback((field: keyof ContactFormState, value: string) =>
@@ -31,7 +31,13 @@ export function ContactFormProvider({ children }: { children: ReactNode }) {
         timezone: getBrowserTimezone(),
         ...(stage ? { stage } : {}),
       });
-      setConfirmation(data.confirmation === "failed" ? "failed" : "sent");
+      setConfirmation(
+        data.confirmation === "failed"
+          ? "failed"
+          : data.confirmation === "pending"
+            ? "pending"
+            : "sent"
+      );
       setLeadRef(data.leadRef ?? null);
       setSubmitted(true);
     } catch (err) {

@@ -284,6 +284,11 @@ export default function Contact() {
                         Confirmation email sent to {form.email}.
                       </span>
                     )}
+                    {confirmation === "pending" && (
+                      <span style={{ fontSize: "0.75rem", color: textMuted, marginTop: 2 }}>
+                        Confirmation is on its way to {form.email}.
+                      </span>
+                    )}
                     {confirmation === "failed" && (
                       <span style={{ fontSize: "0.75rem", color: textMuted, marginTop: 2 }}>
                         Inbound received, but our confirmation email could not be delivered.

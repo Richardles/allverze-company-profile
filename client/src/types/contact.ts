@@ -21,7 +21,12 @@ export interface ContactPayload extends ContactFormState {
 
 export interface ContactResponse {
   success: boolean;
-  confirmation?: "sent" | "failed" | "skipped";
+  /**
+   * `pending` means the lead was delivered but the customer confirmation was
+   * still in flight when the response budget ran out — it usually arrives a
+   * moment later. Only `sent` means we know it landed.
+   */
+  confirmation?: "sent" | "failed" | "skipped" | "pending";
   leadRef?: string;
   message?: string;
 }
