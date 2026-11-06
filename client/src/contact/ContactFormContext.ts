@@ -11,6 +11,8 @@ export interface ContactFormContextValue {
   leadRef: string | null;
   updateField: (field: keyof ContactFormState, value: string) => void;
   setIntent: (intent: ContactIntent) => void;
+  stage: string;
+  setStage: (stage: string) => void;
   handleSubmit: () => Promise<void>;
   reset: () => void;
 }

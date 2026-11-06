@@ -5,6 +5,14 @@ export const CONTACT_INTENTS: ContactIntent[] = [
   "Mobile Application Development",
   "Application Performance Monitoring",
   "Performance & Automation Testing",
-  "Discovery & Advisory",
+"Discovery & Advisory",
   "Something else",
+];
+
+export const PROJECT_STAGES: string[] = [
+  "Concept — just an idea",
+  "In development",
+  "Live, needs improvement",
+  "Maintenance & support",
+  "Not sure yet",
 ];

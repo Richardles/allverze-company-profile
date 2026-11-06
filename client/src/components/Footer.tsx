@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { openContactForm } from "../lib/contactNav";
+import { statusGlow } from "../lib/statusDot";
 import allverzeLogo from "../imports/logo.webp";
 import { WHATSAPP_URL, WHATSAPP_NUMBER, PUBLIC_EMAIL } from "../config";
 
@@ -108,7 +109,7 @@ export default function Footer() {
               Connecting possibilities through technology, ideas, and dependable execution. We Solve — Not Just Sell.
             </p>
             <div className="flex items-center gap-2">
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E" }} />
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", boxShadow: statusGlow(6) }} />
               <span style={{ fontSize: "0.74rem", color: "rgba(248,250,252,0.30)" }}>
                 Currently accepting new engagements
               </span>

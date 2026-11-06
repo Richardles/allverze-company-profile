@@ -8,6 +8,7 @@ import type { ContactFormState, ContactIntent } from "../types/contact";
 export function ContactFormProvider({ children }: { children: ReactNode }) {
   const [form, setForm] = useState<ContactFormState>({ name: "", email: "", phone: "", message: "" });
   const [intent, setIntent] = useState<ContactIntent>(CONTACT_INTENTS[0]);
+  const [stage, setStage] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -28,6 +29,7 @@ export function ContactFormProvider({ children }: { children: ReactNode }) {
         message: `[Intent: ${intent}]\n\n${form.message}`,
         botcheck: "",
         timezone: getBrowserTimezone(),
+        ...(stage ? { stage } : {}),
       });
       setConfirmation(data.confirmation === "failed" ? "failed" : "sent");
       setLeadRef(data.leadRef ?? null);
@@ -41,11 +43,12 @@ export function ContactFormProvider({ children }: { children: ReactNode }) {
     } finally {
       setSending(false);
     }
-  }, [form, intent, sending]);
+  }, [form, intent, sending, stage]);
 
   const reset = useCallback(() => {
     setForm({ name: "", email: "", phone: "", message: "" });
     setIntent(CONTACT_INTENTS[0]);
+    setStage("");
     setError("");
     setSubmitted(false);
     setConfirmation(null);
@@ -62,6 +65,8 @@ export function ContactFormProvider({ children }: { children: ReactNode }) {
     leadRef,
     updateField,
     setIntent,
+    stage,
+    setStage,
     handleSubmit,
     reset,
   };
