@@ -1,6 +1,5 @@
 const DEFAULTS = {
   port: 3001,
-  smtpPort: 587,
   fromEmail: 'hello@allverze.com',
   contactEmail: 'hello@allverze.com',
   publicEmail: 'hello@allverze.com',
@@ -10,7 +9,14 @@ const DEFAULTS = {
   timezoneLabel: 'WIB',
 };
 
-const REQUIRED_ENV = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'];
+/**
+ * Only the Resend API key is strictly required now that we send over HTTPS.
+ *
+ * NOTE: the env var is still called SMTP_PASS so no dashboard change is needed
+ * on an already-deployed host (its value was always a Resend API key). It is
+ * surfaced internally as `resendApiKey`, which is what it actually is.
+ */
+const REQUIRED_ENV = ['SMTP_PASS'];
 
 export function loadConfig() {
   const missing = REQUIRED_ENV.filter((key) => !process.env[key]?.trim());
@@ -21,10 +27,7 @@ export function loadConfig() {
 
   return {
     port: Number(process.env.PORT || DEFAULTS.port),
-    smtpHost: process.env.SMTP_HOST,
-    smtpPort: Number(process.env.SMTP_PORT || DEFAULTS.smtpPort),
-    smtpUser: process.env.SMTP_USER,
-    smtpPass: process.env.SMTP_PASS,
+    resendApiKey: process.env.SMTP_PASS,
     fromEmail: process.env.SMTP_FROM || process.env.PUBLIC_EMAIL || DEFAULTS.fromEmail,
     contactEmail: process.env.CONTACT_EMAIL || DEFAULTS.contactEmail,
     publicEmail: process.env.PUBLIC_EMAIL || DEFAULTS.publicEmail,

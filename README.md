@@ -31,7 +31,7 @@ npm-workspaces monorepo with two packages:
         ├── config.js   env config with fail-fast
         ├── validation.js
         ├── routes/     health, contact
-        ├── services/   emailService (nodemailer + retry)
+        ├── services/   emailService (Resend HTTPS API, concurrent sends + retry)
         ├── lib/        intents, leadRef, whatsapp, format
         └── templates/  email HTML/text (inbound, confirmation)
 ```

@@ -1,26 +1,16 @@
-import nodemailer from 'nodemailer';
 import { extractIntent } from '../lib/intents.js';
 import { buildLeadRef } from '../lib/leadRef.js';
 import { formatWhatsAppDisplay, formatReceivedAt, formatUserReceivedAt } from '../lib/format.js';
+import { sendEmail } from '../lib/resend.js';
 import { buildCompanyWhatsAppHref, buildLeadWhatsAppHref } from '../lib/whatsapp.js';
 import { renderConfirmation } from '../templates/confirmation.js';
 import { renderInbound } from '../templates/inbound.js';
 
 const SEND_ATTEMPTS = 2;
 const RETRY_DELAY_MS = 1000;
-const CONFIRMATION_DELAY_MS = 3000;
+const FROM_NAME = 'Allverze Corporation';
 
 export function createEmailService(config) {
-  const transporter = nodemailer.createTransport({
-    host: config.smtpHost,
-    port: config.smtpPort,
-    secure: config.smtpPort === 465,
-    auth: {
-      user: config.smtpUser,
-      pass: config.smtpPass,
-    },
-  });
-
   return {
     async processInquiry(contact) {
       const receivedAt = formatReceivedAt(new Date(), config.timezone, config.timezoneLabel);
@@ -29,6 +19,7 @@ export function createEmailService(config) {
           ? formatUserReceivedAt(new Date(), contact.timezone)
           : null;
       const { label: intentLabel, cleanMessage } = extractIntent(contact.message);
+      const stage = contact.stage ?? undefined;
       const leadRef = buildLeadRef(intentLabel, config.timezone);
 
       const waHref = buildLeadWhatsAppHref({ name: contact.name, phone: contact.phone, leadRef });
@@ -38,60 +29,101 @@ export function createEmailService(config) {
         leadRef,
       });
 
-      await sendWithRetry(transporter, {
-        from: `Allverze Corporation <${config.fromEmail}>`,
-        to: config.contactEmail,
-        envelope: { from: config.fromEmail, to: [config.contactEmail] },
-        replyTo: contact.email,
-        ...renderInbound({
-          leadRef,
-          receivedAt,
-          userReceivedAt,
-          intentLabel,
-          name: contact.name,
-          email: contact.email,
-          phone: contact.phone,
-          message: cleanMessage,
-          waHref,
-        }),
+      // Both emails are dispatched CONCURRENTLY, then both awaited.
+      //
+      // This deliberately replaced a `setTimeout(3000)` that used to sit between
+      // the two sends, which put a hard 3-second floor under every contact-form
+      // submission. The two recipients are independent, so there is nothing to
+      // gain by serialising them — and because we still await both before
+      // responding, the work is safe on serverless hosts (Vercel) where work
+      // started after the response is discarded.
+      //
+      // Both promises are created before either is awaited; that ordering is
+      // what makes the two network calls actually overlap.
+      const startedAt = performance.now();
+
+      // Each send is timed independently from the moment it STARTS, so the
+      // numbers reported are each send's own duration — not its marginal
+      // contribution. `total` being close to max(inbound, confirmation)
+      // rather than their sum is the proof that they really did overlap.
+      const inboundStart = performance.now();
+      let inboundMs = 0;
+
+      const inboundPromise = sendWithRetry(() =>
+        sendEmail(config, {
+          fromName: FROM_NAME,
+          to: config.contactEmail,
+          replyTo: contact.email,
+          idempotencyKey: `${leadRef}-inbound`,
+          ...renderInbound({
+            leadRef,
+            receivedAt,
+            userReceivedAt,
+            intentLabel,
+            stage,
+            name: contact.name,
+            email: contact.email,
+            phone: contact.phone,
+            message: cleanMessage,
+            waHref,
+          }),
+        })
+      ).finally(() => {
+        inboundMs = Math.round(performance.now() - inboundStart);
       });
-      console.log(`[inbound-email] Sent inquiry ${leadRef} to ${config.contactEmail}`);
 
-      await delay(CONFIRMATION_DELAY_MS);
+      const confirmationStart = performance.now();
+      let confirmationMs = 0;
 
-      const confirmation = await sendConfirmation({
+      const confirmationPromise = sendConfirmation({
         contact,
         cleanMessage,
         intentLabel,
+        stage,
         leadRef,
         receivedAt,
         userReceivedAt,
         waCompanyHref,
+      }).finally(() => {
+        confirmationMs = Math.round(performance.now() - confirmationStart);
       });
 
-      return { confirmation, leadRef };
+      await inboundPromise;
+      console.log(`[inbound-email] Sent inquiry ${leadRef} to ${config.contactEmail}`);
+
+      const confirmation = await confirmationPromise;
+      const totalMs = Math.round(performance.now() - startedAt);
+
+      return {
+        confirmation,
+        leadRef,
+        timings: { inboundMs, confirmationMs, totalMs },
+      };
     },
   };
 
-  async function sendConfirmation({ contact, cleanMessage, intentLabel, leadRef, receivedAt, userReceivedAt, waCompanyHref }) {
+  async function sendConfirmation({ contact, cleanMessage, intentLabel, stage, leadRef, receivedAt, userReceivedAt, waCompanyHref }) {
     try {
-      await sendWithRetry(transporter, {
-        from: `Allverze Corporation <${config.fromEmail}>`,
-        to: contact.email,
-        envelope: { from: config.fromEmail, to: [contact.email] },
-        ...renderConfirmation({
-          leadRef,
-          receivedAt,
-          userReceivedAt,
-          intentLabel,
-          name: contact.name,
-          phone: contact.phone,
-          message: cleanMessage,
-          publicEmail: config.publicEmail,
-          whatsappDisplay: formatWhatsAppDisplay(config.whatsappNumber),
-          waCompanyHref,
-        }),
-      });
+      await sendWithRetry(() =>
+        sendEmail(config, {
+          fromName: FROM_NAME,
+          to: contact.email,
+          idempotencyKey: `${leadRef}-confirmation`,
+          ...renderConfirmation({
+            leadRef,
+            receivedAt,
+            userReceivedAt,
+            intentLabel,
+            stage,
+            name: contact.name,
+            phone: contact.phone,
+            message: cleanMessage,
+            publicEmail: config.publicEmail,
+            whatsappDisplay: formatWhatsAppDisplay(config.whatsappNumber),
+            waCompanyHref,
+          }),
+        })
+      );
       console.log(`[confirmation-email] Confirmation sent to ${contact.email} for ${leadRef}`);
       return 'sent';
     } catch (confirmError) {
@@ -104,11 +136,18 @@ export function createEmailService(config) {
   }
 }
 
-async function sendWithRetry(transporter, mail, attempts = SEND_ATTEMPTS) {
+/**
+ * Retries a send on transient failure.
+ *
+ * Takes a thunk rather than a mail object so each attempt performs a fresh
+ * request. The `Idempotency-Key` set in the caller stays constant across
+ * attempts, so a retry can never produce a duplicate email.
+ */
+async function sendWithRetry(send, attempts = SEND_ATTEMPTS) {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      return await transporter.sendMail(mail);
+      return await send();
     } catch (error) {
       lastError = error;
       if (attempt < attempts) {

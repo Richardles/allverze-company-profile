@@ -5,6 +5,7 @@ export function renderConfirmation({
   receivedAt,
   userReceivedAt,
   intentLabel,
+  stage,
   name,
   phone,
   message,
@@ -15,6 +16,8 @@ export function renderConfirmation({
   const safeName = escapeHtml(name);
   const safePhone = escapeHtml(phone);
   const safeMessage = `${escapeHtml(message.slice(0, 300))}${message.length > 300 ? '...' : ''}`;
+  const safeIntent = escapeHtml(intentLabel);
+  const safeStage = stage ? escapeHtml(stage) : '';
 
   const mailtoSubject = encodeURIComponent(`Inquiry ${leadRef} — Allverze`);
   const mailtoBody = encodeURIComponent(`Hi Allverze team,\n\nThank you for confirming my inquiry (Reference: ${leadRef}).\n\nI have a quick question, or a few more details I'd like to add:\n\n\n\nBest regards,\n${name}`);
@@ -28,7 +31,7 @@ Thank you for reaching out to Allverze. We've received your message — a real p
 
 Reference: ${leadRef}
 Submitted: ${userReceivedAt ?? receivedAt}
-${userReceivedAt ? `Allverze Time: ${receivedAt}\n` : ''}Intent: ${intentLabel}
+${userReceivedAt ? `Allverze Time: ${receivedAt}\n` : ''}Intent: ${intentLabel}${stage ? `\nProject stage: ${stage}` : ''}
 Phone: ${phone}
 
 Prefer to talk directly? We're one message away:
@@ -93,8 +96,16 @@ The Allverze Team`,
                         : ''}
                       <tr>
                         <td style="padding:6px 0;font-size:13px;color:#8AA0BD;vertical-align:top;">Intent</td>
-                        <td style="padding:6px 0;font-size:14px;font-weight:600;color:#0B1D35;">${intentLabel}</td>
+                        <td style="padding:6px 0;font-size:14px;font-weight:600;color:#0B1D35;">${safeIntent}</td>
                       </tr>
+                      ${
+                        safeStage
+                          ? `<tr>
+                        <td style="padding:6px 0;font-size:13px;color:#8AA0BD;vertical-align:top;">Project stage</td>
+                        <td style="padding:6px 0;font-size:14px;font-weight:600;color:#0B1D35;">${safeStage}</td>
+                      </tr>`
+                          : ''
+                      }
                       <tr>
                         <td style="padding:6px 0;font-size:13px;color:#8AA0BD;vertical-align:top;">Phone</td>
                         <td style="padding:6px 0;font-size:14px;font-weight:600;color:#0B1D35;">${safePhone}</td>

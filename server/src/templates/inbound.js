@@ -1,17 +1,19 @@
 import { escapeHtml } from '../lib/format.js';
 
-export function renderInbound({ leadRef, receivedAt, userReceivedAt, intentLabel, name, email, phone, message, waHref }) {
+export function renderInbound({ leadRef, receivedAt, userReceivedAt, intentLabel, stage, name, email, phone, message, waHref }) {
   const safeName = escapeHtml(name);
   const safeEmail = escapeHtml(email);
   const safePhone = escapeHtml(phone);
   const safeMessage = escapeHtml(message);
+  const safeIntent = escapeHtml(intentLabel);
+  const safeStage = stage ? escapeHtml(stage) : '';
 
   return {
     subject: `New contact message from ${name}`,
     text: `NEW CONTACT MESSAGE
 Lead Reference: ${leadRef}
 Submitted: ${receivedAt}
-${userReceivedAt ? `Customer Time: ${userReceivedAt}\n` : ''}Intent: ${intentLabel}
+${userReceivedAt ? `Customer Time: ${userReceivedAt}\n` : ''}Intent: ${intentLabel}${stage ? `\nProject stage: ${stage}` : ''}
 
 Name: ${name}
 Email: ${email}
@@ -107,8 +109,16 @@ RESPONSE SLA: Reply to this customer within 1 business day.`,
                       </tr>
                       <tr>
                         <td style="padding:6px 0;font-size:13px;color:#8AA0BD;vertical-align:top;">Intent</td>
-                        <td style="padding:6px 0;font-size:14px;color:#0B1D35;font-weight:600;">${intentLabel}</td>
+                        <td style="padding:6px 0;font-size:14px;color:#0B1D35;font-weight:600;">${safeIntent}</td>
                       </tr>
+                      ${
+                        safeStage
+                          ? `<tr>
+                        <td style="padding:6px 0;font-size:13px;color:#8AA0BD;vertical-align:top;">Project stage</td>
+                        <td style="padding:6px 0;font-size:14px;color:#0B1D35;font-weight:600;">${safeStage}</td>
+                      </tr>`
+                          : ''
+                      }
                     </table>
                   </td>
                 </tr>
